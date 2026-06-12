@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Operator Provider Portal</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="portal theme-operator">
+
+<header class="portal-header">
+  <span class="chip">PROVIDER</span>
+  <h1>Operator Portal</h1>
+  <p class="sub">Publish the fraud-detection API (SIM Swap) to the CAPIF catalog.</p>
+</header>
+
+<p class="hint">Follow the steps in order. Step 2 unlocks after step 1 succeeds. Then open CAPIF (MongoDB) to see the published API.</p>
+
+<section class="steps">
+  <button id="b-register">1 &nbsp; Register with CAPIF Core</button>
+  <button id="b-publish" disabled>2 &nbsp; Publish SIM Swap API</button>
+</section>
+<section class="steps">
+  <a class="link" href="http://localhost:8082" target="_blank">Open CAPIF (MongoDB)</a>
+  <button id="b-reset" class="secondary">Reset system</button>
+</section>
+
+<main id="out"></main>
+
+<footer>Operator (Provider) &middot; authenticates with a certificate (mTLS)</footer>
+
+<script src="portal.js"></script>
+<script>
+  // Reset states on load to counter browser caching/restoring states
+  document.getElementById("b-publish").disabled = true;
+
+  wire("b-register", "/api/op/register", null, () => enable("b-publish"));
+  wire("b-publish", "/api/op/publish");
+  document.getElementById("b-reset").addEventListener("click", resetAll);
+</script>
+</body>
+</html>

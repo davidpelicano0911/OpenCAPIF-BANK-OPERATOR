@@ -1,0 +1,60 @@
+services:
+  register:
+    hostname: ${CAPIF_REGISTER}
+    container_name: ${CAPIF_REGISTER}
+    build:
+      context: ${SERVICES_DIR}/register
+    ports:
+      - 8084:8080
+    volumes:
+      - ${SERVICES_DIR}/register/config.yaml:/usr/src/app/config.yaml
+    environment:
+      - CAPIF_PRIV_KEY=${CAPIF_PRIV_KEY}
+      - VAULT_HOSTNAME=vault
+      - VAULT_ACCESS_TOKEN=dev-only-token
+      - VAULT_PORT=8200
+      - LOG_LEVEL=${LOG_LEVEL}
+      - TIMEOUT=10
+      - CAPIF_HOSTNAME=${CAPIF_HOSTNAME}
+      - REGISTER_HOSTNAME=${CAPIF_REGISTER}
+    extra_hosts:
+      - host.docker.internal:host-gateway
+      - vault:host-gateway
+    restart: unless-stopped
+    image: ${REGISTRY_BASE_URL}/register:${OCF_VERSION}
+    depends_on:
+       - mongo_register
+
+  mongo_register:
+    image: labs.etsi.org:5050/ocf/capif/mongo:6.0.2
+    logging:
+      driver: 'none'
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: example
+
+  mongo_register_express:
+    image: labs.etsi.org:5050/ocf/capif/mongo-express:1.0.0-alpha.4
+    logging:
+      driver: 'none'
+    restart: unless-stopped
+    ports:
+      - 8083:8081
+    environment:
+      ME_CONFIG_MONGODB_ENABLE_ADMIN: true
+      ME_CONFIG_BASICAUTH_USERNAME: admin
+      ME_CONFIG_BASICAUTH_PASSWORD: admin
+      ME_CONFIG_MONGODB_ADMINUSERNAME: root
+      ME_CONFIG_MONGODB_ADMINPASSWORD: example
+      ME_CONFIG_MONGODB_URL: mongodb://root:example@mongo_register:27017/
+    depends_on:
+      - mongo_register
+
+networks:
+  default:
+    name: capif-network
+    external: true
+
+
+

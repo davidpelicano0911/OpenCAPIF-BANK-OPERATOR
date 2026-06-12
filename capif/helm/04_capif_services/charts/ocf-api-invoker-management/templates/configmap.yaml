@@ -1,0 +1,41 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: capif-invoker-configmap
+data:
+  config.yaml: |
+    mongo: {
+      'user': '{{ .Values.env.mongoInitdbRootUsername }}',
+      'password': '{{ .Values.env.mongoInitdbRootPassword }}',
+      'db': 'capif',
+      'col': 'invokerdetails',
+      'capif_users_col': 'user',
+      'certs_col': 'certs',
+      'service_col': 'serviceapidescriptions',
+      'host': 'mongo',
+      'port': "27017"
+    }
+    mongo_register: {
+      'user': '{{ .Values.env.mongoRegister.mongoInitdbRootUsername }}',
+      'password': '{{ .Values.env.mongoRegister.mongoInitdbRootPassword }}',
+      'db': 'capif_users',
+      'col': 'user',
+      'host': 'mongo-register',
+      'port': '27017'
+    }
+    ca_factory: {
+      "url": {{ quote .Values.env.vaultHostname }},
+      "port": {{ quote .Values.env.vaultPort }},
+      "token": {{ quote .Values.env.vaultAccessToken }}
+    }
+
+    monitoring: {
+      "fluent_bit_host": fluent-bit,
+      "fluent_bit_port": 24224,
+      "opentelemetry_url": "otel-collector",
+      "opentelemetry_port": "55680",
+      "opentelemetry_max_queue_size": 8192,
+      "opentelemetry_schedule_delay_millis": 20000,
+      "opentelemetry_max_export_batch_size": 2048,
+      "opentelemetry_export_timeout_millis": 60000
+    }

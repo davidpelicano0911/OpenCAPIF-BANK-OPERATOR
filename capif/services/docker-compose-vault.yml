@@ -1,0 +1,18 @@
+services:
+  vault:
+    image: ${REGISTRY_BASE_URL}/vault:${OCF_VERSION}
+    build:
+      context: ${SERVICES_DIR}/vault
+    restart: unless-stopped
+    ports:
+      - 8200:8200
+    cap_add:
+      - IPC_LOCK
+    environment:
+      - VAULT_DEV_ROOT_TOKEN_ID=dev-only-token
+      - VAULT_DEV_LISTEN_ADDRESS=0.0.0.0:8200
+      - CAPIF_HOSTNAME=${CAPIF_HOSTNAME}
+    volumes:
+      - ${SERVICES_DIR}/vault/data:/vault/data
+      - ${SERVICES_DIR}/vault/config:/vault/config
+      - ${SERVICES_DIR}/vault/vault_prepare_certs.sh:/vault_prepare_certs.sh

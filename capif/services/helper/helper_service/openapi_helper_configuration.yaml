@@ -1,0 +1,305 @@
+openapi: 3.0.1
+info:
+  title: Helper Configuration API
+  version: "1.0.0"
+  description: |
+    CAPIF Helper Configuration API. Allows reading and modifying the runtime configuration
+    stored in MongoDB (ACL policy, certificate expiration, security priorities, etc).
+servers:
+  - url: "{apiRoot}/configuration"
+    variables:
+      apiRoot:
+        default: http://localhost:8080
+        description: Base URL of the Helper service.
+paths:
+  /getConfiguration:
+    get:
+      summary: Read full configuration
+      description: Returns the entire CAPIF configuration document.
+      operationId: configuration_controller.get_configuration
+      responses:
+        '200':
+          description: Current configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CapifConfiguration'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        default:
+          $ref: '#/components/responses/GenericError'
+  /updateConfigParam:
+    patch: 
+      summary: Update single config parameter
+      description: Updates a single setting inside the configuration using a dotted path selector.
+      operationId: dynamic_config_controller.update_config_param
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfigParamUpdateRequest'
+      responses:
+        '200':
+          description: Parameter updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CapifConfiguration'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        default:
+          $ref: '#/components/responses/GenericError'
+  /replaceConfiguration:
+    put:
+      summary: Replace entire configuration
+      description: Replaces the configuration document with a new one.
+      operationId: dynamic_config_controller.replace_configuration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CapifConfiguration'
+      responses:
+        '200':
+          description: Updated configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CapifConfiguration'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        default:
+          $ref: '#/components/responses/GenericError'
+  /addNewConfiguration:
+    post:
+      summary: Add new config setting at path
+      description: Adds a new key/value inside an existing category using "param_path" and "new_value".
+      operationId: dynamic_config_controller.add_new_config_setting
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfigParamUpdateRequest'
+      responses:
+        '200':
+          description: Setting added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CapifConfiguration'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        default:
+          $ref: '#/components/responses/GenericError'
+  /addNewConfigSetting:
+    patch:
+      summary: Add new configuration category
+      description: Adds a brand new top-level category.
+      operationId: dynamic_config_controller.add_new_configuration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfigCategoryCreateRequest'
+      responses:
+        '200':
+          description: Category added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CapifConfiguration'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        default:
+          $ref: '#/components/responses/GenericError'
+  /removeConfigParam:
+    delete:
+      summary: Remove config parameter
+      description: Deletes a leaf parameter by dotted path.
+      operationId: dynamic_config_controller.remove_config_param
+      parameters:
+        - name: param_path
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Parameter path to remove
+      responses:
+        '200':
+          description: Parameter removed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CapifConfiguration'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        default:
+          $ref: '#/components/responses/GenericError'
+  /removeConfigCategory:
+    delete:
+      summary: Remove configuration category
+      description: Deletes an entire top-level category by name.
+      operationId: dynamic_config_controller.remove_config_category
+      parameters:
+        - name: config_path
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Configuration path to remove
+      responses:
+        '200':
+          description: Category removed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CapifConfiguration'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        default:
+          $ref: '#/components/responses/GenericError'
+components:
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/GenericError'
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/GenericError'
+    GenericError:
+      description: Generic error response
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/GenericError'
+  schemas:
+    CapifConfiguration:
+      type: object
+      additionalProperties: true
+      description: CAPIF runtime configuration document.
+      properties:
+        config_name:
+          type: string
+          example: default
+          description: Configuration name
+        version:
+          type: string
+          example: 1.0
+          description: configuration version
+        settings:
+          type: object
+          items:
+            $ref: '#/components/schemas/Settings'
+    ConfigParamUpdateRequest:
+      type: object
+      required:
+        - param_path
+        - new_value
+      properties:
+        param_path:
+          type: string
+          description: Dotted path to the configuration value to update.
+        new_value:
+          description: New value for the configuration parameter.
+    ConfigCategoryCreateRequest:
+      type: object
+      required:
+        - category_name
+        - category_values
+      properties:
+        category_name:
+          type: string
+          description: Name of the new configuration category.
+        category_values:
+          type: object
+          additionalProperties: true
+          description: Key/value pairs that compose the new category.
+    GenericError:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+      required:
+        - code
+        - message
+    Settings:
+      type: object
+      description: Configuration Settings
+      properties:
+        certificates_expiry:
+          type: object
+          description: Expiry configuration for certificates
+          properties:
+            ttl_superadmin_cert:
+              type: string
+              example: 4300h
+              description: ttl for superadmin certificates
+            ttl_invoker_cert:
+              type: string
+              example: 4300h
+              description: ttl for invoker certificates
+            ttl_provider_cert:
+              type: string
+              example: 4300h
+              description: ttl for provider certificates
+        security_method_priority:
+          type: object
+          description: priority to follow in granting the security method
+          properties:
+            oauth:
+              type: integer
+              example: 1
+            pki:
+              type: integer
+              example: 2
+            psk:
+              type: integer
+              example: 3
+        acl_policy_settings:
+          type: object
+          description: default access policies
+          properties:
+            allowed_total_invocations:
+              type: string
+              example: 5
+              description: total number of requests the invoker can make
+            allowed_invocations_per_second:
+              type: string
+              example: 5
+              description: total number of requests the invoker can make per second
+            allowed_invocations_time_range_days:
+              type: integer
+              example: 365
+              description: time range when an invoker can make requests
+          
+          
+          
+          
+          
+          
+          
+          

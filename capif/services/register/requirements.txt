@@ -1,0 +1,12 @@
+python_dateutil >= 2.6.0
+setuptools == 80.9.0
+Flask == 3.0.3
+pymongo == 4.7.3
+flask_jwt_extended == 4.6.0
+pyopenssl == 25.3.0
+pyyaml == 6.0.1
+requests == 2.32.2
+bcrypt == 4.3.0
+flask_httpauth == 4.8.0
+gunicorn == 23.0.0
+packaging == 24.0

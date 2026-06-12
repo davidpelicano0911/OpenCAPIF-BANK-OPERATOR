@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CAPIF Portals</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="landing">
+<header>
+  <h1>CAPIF API Security</h1>
+  <p class="sub">Practical showcase of API access control and exposure</p>
+</header>
+
+<section class="portals">
+  <a class="portal-link theme-operator" href="/operadora" target="_blank">
+    <span class="chip">PROVIDER</span>
+    <div class="name">Operator</div>
+    <div class="desc">Operator portal to register services and publish the SIM Swap API to the CAPIF catalog.</div>
+    <div class="action-hint">Open Operator Portal &rarr;</div>
+  </a>
+  <a class="portal-link theme-capif" href="http://localhost:8082" target="_blank">
+    <span class="chip">FRAMEWORK</span>
+    <div class="name">CAPIF Core</div>
+    <div class="desc">Access Mongo Express to inspect real-time database entries (Invokers, APIs, and Security Contexts).</div>
+    <div class="action-hint">Open Database (MongoDB) &rarr;</div>
+  </a>
+  <a class="portal-link theme-bank" href="/banco" target="_blank">
+    <span class="chip">INVOKER</span>
+    <div class="name">Bank</div>
+    <div class="desc">Bank portal to discover the published API, request OAuth2 access tokens, and check SIM Swap fraud.</div>
+    <div class="action-hint">Open Bank Portal &rarr;</div>
+  </a>
+</section>
+
+<section class="demo-flow">
+  <h2>API Lifetime Flow</h2>
+  <div class="flow-steps">
+    <div class="flow-step">
+      <div class="step-num">1</div>
+      <h3>Publish API</h3>
+      <p>The <strong>Operator</strong> registers via mTLS and publishes the SIM Swap API to the CAPIF catalog.</p>
+    </div>
+    <div class="flow-arrow">&rarr;</div>
+    <div class="flow-step">
+      <div class="step-num">2</div>
+      <h3>Discover & Authorize</h3>
+      <p>The <strong>Bank</strong> registers, discovers the cataloged API, and requests an OAuth2 access token from CAPIF.</p>
+    </div>
+    <div class="flow-arrow">&rarr;</div>
+    <div class="flow-step">
+      <div class="step-num">3</div>
+      <h3>Consume & Protect</h3>
+      <p>The <strong>Bank</strong> calls the SIM Swap API using the token to securely validate and authorize transactions.</p>
+    </div>
+  </div>
+</section>
+
+<footer>
+  OpenCAPIF &middot; 3GPP Standard Framework for API Exposure
+</footer>
+</body>
+</html>

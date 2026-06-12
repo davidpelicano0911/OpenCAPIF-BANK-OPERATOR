@@ -1,0 +1,28 @@
+mongo: {
+  'user': 'root',
+  'password': 'example',
+  'db': 'capif',
+  'col': 'invokerdetails',
+  'certs_col': "certs",
+  'service_col': 'serviceapidescriptions',
+  'host': 'mongo',
+  'port': "27017"
+}
+
+ca_factory: {
+  "url": "vault",
+  "port": "8200",
+  "token": "dev-only-token",
+  "verify": False
+}
+
+monitoring: {
+  "fluent_bit_host": fluent-bit,
+  "fluent_bit_port": 24224,
+  "opentelemetry_url": "otel-collector",
+  "opentelemetry_port": "55680",
+  "opentelemetry_max_queue_size": 8192,
+  "opentelemetry_schedule_delay_millis": 20000,
+  "opentelemetry_max_export_batch_size": 2048,
+  "opentelemetry_export_timeout_millis": 60000
+}

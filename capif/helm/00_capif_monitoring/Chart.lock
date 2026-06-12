@@ -1,0 +1,18 @@
+dependencies:
+- name: fluentbit
+  repository: ""
+  version: '*'
+- name: grafana
+  repository: ""
+  version: '*'
+- name: loki
+  repository: ""
+  version: '*'
+- name: otelcollector
+  repository: ""
+  version: '*'
+- name: tempo
+  repository: https://grafana.github.io/helm-charts
+  version: 1.24.4
+digest: sha256:e9dce1f5454cecc4aa05e9cfe7d5b0def7121decd4f5acb252a68bd0a90eace4
+generated: "2026-03-20T12:34:52.01658+01:00"

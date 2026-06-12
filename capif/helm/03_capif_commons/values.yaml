@@ -1,0 +1,8 @@
+# -- To enable monitoring in ocf.
+# -- enabled the next services:
+# -- tempo, fluentbit, grafana, loki, otelcollector and renderer.
+# -- prometheus service must be previously installed in kubernetes
+
+# -- With mock-server.enabled: false. It won't be deployed
+mock-server:
+  enabled: false

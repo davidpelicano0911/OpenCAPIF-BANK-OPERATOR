@@ -1,0 +1,21 @@
+{{- if .Values.enabled | default false }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: fluent-bit
+  labels:
+    {{- include "fluentbit.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: {{ .Values.service.port }}
+      protocol: UDP
+      name: fluent-bit-udp
+    - port: {{ .Values.service.port }} 
+      targetPort: {{ .Values.service.port }}
+      protocol: TCP
+      name: fluent-bit-tcp
+  selector:
+    {{- include "fluentbit.selectorLabels" . | nindent 4 }}
+{{- end }}

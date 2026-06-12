@@ -1,0 +1,17 @@
+{{- if .Values.enabled | default false }}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "loki.fullname" . }}-test-connection"
+  labels:
+    {{- include "loki.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+    - name: wget
+      image: busybox
+      command: ['wget']
+      args: ['loki:{{ .Values.service.port }}']
+  restartPolicy: Never
+{{- end }}

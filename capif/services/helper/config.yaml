@@ -1,0 +1,49 @@
+mongo:
+  user: root
+  password: example
+  db: capif
+  invoker_col: invokerdetails
+  provider_col: providerenrolmentdetails
+  col_services: serviceapidescriptions
+  col_security: security
+  col_event: eventsdetails
+  col_capif_configuration: capif_configuration
+  host: mongo
+  port: 27017
+
+
+ca_factory: 
+  url: vault
+  port: 8200
+  token: dev-only-token
+  verify: False
+
+
+capif_configuration: 
+  config_description: Default CAPIF Configuration
+  config_name: default
+  config_version: "1.0"
+  settings:
+    acl_policy_settings:
+      allowed_invocation_time_range_days: 365
+      allowed_invocations_per_second: 10
+      allowed_total_invocations: 5
+    certificates_expiry:
+      ttl_invoker_cert: 4300h
+      ttl_provider_cert: 4300h
+      ttl_superadmin_cert: 4300h
+    security_method_priority:
+      oauth: 1
+      pki: 2
+      psk: 3
+  
+package_paths:
+  helper_api:
+    path: /api
+    openapi_file: api/openapi/openapi.yaml
+  configuration_api:
+    path: /configuration
+    openapi_file: configuration/openapi/openapi.yaml
+  visibility_control:
+    path: /visibility-control
+    openapi_file: visibility_control/openapi/openapi.yaml

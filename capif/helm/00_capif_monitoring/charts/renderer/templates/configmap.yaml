@@ -1,0 +1,8 @@
+{{- if .Values.enabled | default false }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: renderer-configmap
+data:
+  ENABLE_METRICS: {{ quote .Values.env.enableMetrics }}
+{{- end }}

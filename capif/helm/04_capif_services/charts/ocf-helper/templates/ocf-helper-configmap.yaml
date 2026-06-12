@@ -1,0 +1,44 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ocf-helper-configmap
+data:
+  config.yaml: |
+    mongo: {
+      'user': '{{ .Values.env.mongoInitdbRootUsername }}',
+      'password': '{{ .Values.env.mongoInitdbRootPassword }}',
+      'db': 'capif',
+      'invoker_col': 'invokerdetails',
+      'provider_col': 'providerenrolmentdetails',
+      'col_services': "serviceapidescriptions",
+      'col_security': "security",
+      'col_event': "eventsdetails",
+      'col_capif_configuration': "capif_configuration",
+      'host': '{{ .Values.env.mongoHost }}',
+      'port': "{{ .Values.env.mongoPort }}"
+    }
+
+    ca_factory: {
+      "url": {{ quote .Values.env.vaultHostname }},
+      "port": {{ quote .Values.env.vaultPort }},
+      "token": {{ quote .Values.env.vaultAccessToken }}
+    }
+
+    {{- if .Values.capifConfiguration }}
+    capif_configuration: {{ .Values.capifConfiguration | toYaml | nindent 6 }}
+    {{- end }}
+
+    package_paths: {
+      "helper_api": {
+        "path": "/api",
+        "openapi_file": "api/openapi/openapi.yaml"
+      },
+      "configuration_api": {
+        "path": "/configuration",
+        "openapi_file": "configuration/openapi/openapi.yaml"
+      },
+      "visibility_control": {
+        "path": "/visibility-control",
+        "openapi_file": "visibility_control/openapi/openapi.yaml"
+      }
+    }

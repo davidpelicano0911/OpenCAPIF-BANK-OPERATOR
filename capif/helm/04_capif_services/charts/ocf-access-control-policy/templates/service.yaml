@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: access-control-policy
+  labels:
+    {{- include "ocf-access-control-policy.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "ocf-access-control-policy.selectorLabels" . | nindent 4 }}

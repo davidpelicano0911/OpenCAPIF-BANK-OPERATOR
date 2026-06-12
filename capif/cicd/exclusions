@@ -1,0 +1,5 @@
+../helm/capif/README.md
+../helm/capif/values.yaml
+../services/docker-compose-capif.yml
+../docs/
+../monitoring/

@@ -1,0 +1,49 @@
+
+grafana:
+  enabled: true
+  env:
+    prometheusUrl: http://monitoring-prometheus.monitoring.svc.cluster.local:9090
+  ingress:
+    enable: true
+    hosts:
+      - host: grafana-dt.test.int
+        paths:
+          - path: /
+            pathType: Prefix
+  service:
+    type: ClusterIP
+
+prometheus:
+  enabled: true
+  ingress:
+    enabled: true
+    hosts:
+      - host: prometheus-dt.test.int
+        paths:
+          - path: /
+            pathType: Prefix
+  serviceAccount:
+    create: false
+  service:
+    type: ClusterIP
+
+skooner:
+  enabled: true
+  ingress:
+    enabled: true
+    className: nginx
+    hosts:
+      - host: skooner-dt.test.int
+        paths:
+          - path: /
+            pathType: Prefix
+  service:
+    type: ClusterIP
+
+metrics-server:
+  enabled: false
+  apiService:
+    create: true
+  extraArgs:
+    - --kubelet-insecure-tls=true
+    - --kubelet-preferred-address-types=InternalIP

@@ -1,0 +1,25 @@
+{{- if eq .Values.ingress.className "IngressRoute" }}
+{{- $fullName := include "nginx.fullname" . -}}
+---
+apiVersion: traefik.containo.us/v1alpha1 
+kind: IngressRoute
+metadata:
+  name: {{ $fullName }}-route
+spec:
+  entryPoints: [web] 
+  routes:
+    - kind: Rule
+      {{- range .Values.ingress.hosts }}
+      match: Host(`{{ .host | quote }} && Path(`/ca-root`, `/sign-csr`, `/certdata`, `/register`, `/testdata`, `/getauth`, `/test`)`)
+      services:
+        - kind: Service
+          name: nginx 
+          port: 8080
+          scheme: http
+        - kind: Service
+          name: nginx 
+          port: 443
+      tls:
+        passthrough: true
+      {{- end }}
+{{- end }}

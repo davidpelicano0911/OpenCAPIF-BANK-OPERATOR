@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "ocf-api-invocation-logs.fullname" . }}-test-connection"
+  labels:
+    {{- include "ocf-api-invocation-logs.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+    - name: wget
+      image: busybox
+      command: ['wget']
+      args: ['api-invocation-logs:{{ .Values.service.port }}']
+  restartPolicy: Never

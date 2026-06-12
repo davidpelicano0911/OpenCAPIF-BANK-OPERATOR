@@ -1,0 +1,36 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: register-configmap
+data:
+  config.yaml: |-
+    mongo: {
+      'user': 'root',
+      'password': 'example',
+      'db': 'capif_users',
+      'col': 'user',
+      'col_capif_configuration': 'capif_configuration',
+      'admins': 'admins',
+      'host': '{{ .Values.env.mongoHost }}',
+      'port': '{{ .Values.env.mongoPort }}'
+    }
+    ca_factory: {
+      "url": "{{ .Values.env.vaultHostname }}",
+      "port": "{{ .Values.env.vaultPort }}",
+      "token": "{{ .Values.env.vaultAccessToken }}"
+    }
+    ccf: {
+      "url": "{{ .Values.env.capifHostname }}",
+      "helper_remove_user": "/helper/deleteEntities/"
+    }
+    register: {
+      register_uuid: '6ba7b810-9dad-11d1-80b4-00c04fd430c8',
+      refresh_expiration: 30, #days
+      token_expiration: 10, #mins
+      admin_users: {admin_user: "admin",
+                admin_pass: "password123"}
+    }
+
+    {{- if .Values.capifConfiguration }}
+    capif_configuration: {{ .Values.capifConfiguration | toYaml | nindent 6 }}
+    {{- end }}

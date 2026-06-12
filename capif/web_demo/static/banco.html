@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bank Invoker Portal</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="portal theme-bank">
+
+<header class="portal-header">
+  <span class="chip">INVOKER</span>
+  <h1>Bank Portal</h1>
+  <p class="sub">Discover the SIM Swap API and check customers to prevent fraud.</p>
+</header>
+
+<p class="hint">Complete steps 1&ndash;3 in order. The fraud check remains locked until an access token is obtained &mdash; this is CAPIF's access control: without a token, there is no API access.</p>
+
+<section class="steps">
+  <button id="b-register">1 &nbsp; Register as Invoker</button>
+  <button id="b-discover" disabled>2 &nbsp; Discover APIs</button>
+  <button id="b-token" disabled>3 &nbsp; Get access token</button>
+</section>
+
+<section class="check" id="check-box">
+  <div class="check-title">Fraud Check (SIM Swap)</div>
+  <div class="check-row">
+    <input id="phone" type="text" placeholder="Phone number, e.g. +351912345678" disabled>
+    <button id="b-check" disabled>Check</button>
+  </div>
+  <div class="check-hint" id="check-hint">Locked &mdash; get the access token (step 3) first.</div>
+</section>
+
+<section class="steps">
+  <a class="link" href="http://localhost:8082" target="_blank">Open CAPIF (MongoDB)</a>
+  <button id="b-reset" class="secondary">Reset system</button>
+</section>
+
+<main id="out"></main>
+
+<footer>Bank (Invoker) &middot; accesses with OAuth2 token issued by CAPIF</footer>
+
+<script src="portal.js"></script>
+<script>
+  // Reset states on load to counter browser caching/restoring states
+  document.getElementById("b-discover").disabled = true;
+  document.getElementById("b-token").disabled = true;
+  document.getElementById("phone").disabled = true;
+  document.getElementById("phone").value = "";
+  document.getElementById("b-check").disabled = true;
+
+  wire("b-register", "/api/bk/register", null, () => enable("b-discover"));
+  wire("b-discover", "/api/bk/discover", null, () => enable("b-token"));
+  wire("b-token", "/api/bk/token", null, () => {
+    enable("b-check"); enable("phone");
+    document.getElementById("check-hint").textContent =
+      "Unlocked. Try +351912345678 (safe) or +351911111111 (SIM swapped).";
+  });
+
+  async function checkClient() {
+    const phone = document.getElementById("phone").value.trim();
+    if (!phone) return;
+    const btn = document.getElementById("b-check");
+    btn.disabled = true; btn.textContent = "Checking...";
+    try { render(await runAction("/api/bk/check", { phone })); }
+    catch (e) { render({ ok: false, title: "Error", summary: "Connection failed." }); }
+    btn.textContent = "Check"; btn.disabled = false;
+  }
+  document.getElementById("b-check").addEventListener("click", checkClient);
+  document.getElementById("phone").addEventListener("keydown", e => {
+    if (e.key === "Enter") checkClient();
+  });
+  document.getElementById("b-reset").addEventListener("click", resetAll);
+</script>
+</body>
+</html>

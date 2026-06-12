@@ -1,0 +1,1953 @@
+openapi: 3.0.3
+info:
+  description: |
+    Visibility control API manages visibility rules and evaluate decisions for API discovery and
+    security-context access within OpenCAPIF. This API controls whether APIs are visible to invokers
+    (discovery) and whether invokers are allowed to create a security context to access them.
+    - Rules are global and evaluated with "more specific wins" precedence.
+    - If no rule matches, the decision uses OpenCAPIF's global default (outside this API).
+    - Provider selector is mandatory in rules and must contain at least one selector field (userName is mandatory).
+  title: OpenCAPIF Visibility Control
+  version: 1.0.0
+# servers:
+# - description: Production
+#   url: https://capif.example.com/access-control
+# - description: Sandbox
+#   url: https://sandbox.capif.example.com/access-control
+servers:
+- url: "{apiRoot}/visibility-control"
+  variables:
+    apiRoot:
+      default: http://localhost:8080
+      description: Base URL of the Helper service.
+tags:
+- description: Manage visibility rules
+  name: Rules
+- description: Evaluate discovery and access decisions
+  name: Decision
+paths:
+  /decision/invokers/{apiInvokerId}/discoverable-apis:
+    get:
+      description: |
+        Returns a filtered list of APIs for the API Invoker.
+      operationId: decision_invokers_api_invoker_id_discoverable_apis_get
+      parameters:
+      - description: CAPIF API Invoker identifier
+        explode: false
+        in: path
+        name: apiInvokerId
+        required: true
+        schema:
+          type: string
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiscoveredAPIs'
+          description: Discover filter
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Invalid input
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Invoker not found (optional behavior)
+      summary: Get discoverable APIs filter for an invoker (global scope)
+      tags:
+      - Decision
+      x-openapi-router-controller: visibility_control.controllers.decision_controller
+  /rules:
+    get:
+      operationId: rules_get
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/_rules_get_200_response'
+          description: List of rules
+      summary: List rules
+      tags:
+      - Rules
+      x-openapi-router-controller: visibility_control.controllers.rules_controller
+    post:
+      description: Server generates the ruleId. Provider selector must include at
+        least one field.
+      operationId: rules_post
+      requestBody:
+        content:
+          application/json:
+            examples:
+              allow_except_some_invokers:
+                value:
+                  providerSelector:
+                    userName: userA
+                    apiProviderId:
+                    - capif-prov-01
+                    - capif-prov-02
+                    apiName:
+                    - apiName-001
+                    apiId:
+                    - apiId-001
+                    aefId:
+                    - aef-001
+                  invokerExceptions:
+                    apiInvokerId:
+                    - invk-123
+                    - invk-999
+                  default_access: ALLOW
+                  enabled: true
+            schema:
+              $ref: '#/components/schemas/RuleCreateRequest'
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Rule'
+          description: Rule created
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Invalid input
+      summary: Create a rule
+      tags:
+      - Rules
+      x-openapi-router-controller: visibility_control.controllers.rules_controller
+  /rules/{ruleId}:
+    delete:
+      operationId: rules_rule_id_delete
+      parameters:
+      - description: Server-generated rule identifier
+        explode: false
+        in: path
+        name: ruleId
+        required: true
+        schema:
+          type: string
+        style: simple
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Rule not found
+      summary: Delete a rule
+      tags:
+      - Rules
+      x-openapi-router-controller: visibility_control.controllers.rules_controller
+    get:
+      operationId: rules_rule_id_get
+      parameters:
+      - description: Server-generated rule identifier
+        explode: false
+        in: path
+        name: ruleId
+        required: true
+        schema:
+          type: string
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Rule'
+          description: Rule
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Rule not found
+      summary: Get a rule
+      tags:
+      - Rules
+      x-openapi-router-controller: visibility_control.controllers.rules_controller
+    patch:
+      operationId: rules_rule_id_patch
+      parameters:
+      - description: Server-generated rule identifier
+        explode: false
+        in: path
+        name: ruleId
+        required: true
+        schema:
+          type: string
+        style: simple
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RulePatchRequest'
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Rule'
+          description: Rule updated
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Invalid input
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Rule not found
+      summary: Update a rule (partial)
+      tags:
+      - Rules
+      x-openapi-router-controller: visibility_control.controllers.rules_controller
+components:
+  parameters:
+    RuleId:
+      description: Server-generated rule identifier
+      explode: false
+      in: path
+      name: ruleId
+      required: true
+      schema:
+        type: string
+      style: simple
+    ApiInvokerId:
+      description: CAPIF API Invoker identifier
+      explode: false
+      in: path
+      name: apiInvokerId
+      required: true
+      schema:
+        type: string
+      style: simple
+  schemas:
+    RuleCreateRequest:
+      description: |
+        Create a new rule. Provider selector is mandatory and must include at least one field.
+        If both startsAt and endsAt are present, endsAt must be greater than startsAt.
+      example:
+        default_access: ALLOW
+        notes: notes
+        startsAt: 2000-01-23T04:56:07.000+00:00
+        invokerExceptions:
+          invokerOnboardedByUser:
+          - invokerOnboardedByUser
+          - invokerOnboardedByUser
+          apiInvokerId:
+          - apiInvokerId
+          - apiInvokerId
+        providerSelector:
+          apiProviderId:
+          - apiProviderId
+          - apiProviderId
+          apiName:
+          - apiName
+          - apiName
+          userName: 
+          - userName
+          aefId:
+          - aefId
+          - aefId
+          apiId:
+          - apiId
+          - apiId
+        endsAt: 2000-01-23T04:56:07.000+00:00
+        enabled: true
+      properties:
+        providerSelector:
+          $ref: '#/components/schemas/ProviderSelector'
+        invokerExceptions:
+          $ref: '#/components/schemas/InvokerSelector'
+        default_access:
+          enum:
+          - ALLOW
+          - DENY
+          title: default_access
+          type: string
+        enabled:
+          default: true
+          title: enabled
+          type: boolean
+        startsAt:
+          format: date-time
+          title: startsAt
+          type: string
+        endsAt:
+          format: date-time
+          title: endsAt
+          type: string
+        notes:
+          title: notes
+          type: string
+      required:
+      - default_access
+      - providerSelector
+      title: RuleCreateRequest
+      type: object
+    RulePatchRequest:
+      description: Partial update. Any omitted field remains unchanged.
+      example:
+        default_access: ALLOW
+        notes: notes
+        startsAt: 2000-01-23T04:56:07.000+00:00
+        invokerExceptions:
+          invokerOnboardedByUser:
+          - invokerOnboardedByUser
+          - invokerOnboardedByUser
+          apiInvokerId:
+          - apiInvokerId
+          - apiInvokerId
+        providerSelector:
+          apiProviderId:
+          - apiProviderId
+          - apiProviderId
+          apiName:
+          - apiName
+          - apiName
+          aefId:
+          - aefId
+          - aefId
+          apiId:
+          - apiId
+          - apiId
+        endsAt: 2000-01-23T04:56:07.000+00:00
+        enabled: true
+      properties:
+        providerSelector:
+          $ref: '#/components/schemas/PatchProviderSelector'
+        invokerExceptions:
+          $ref: '#/components/schemas/InvokerSelector'
+        default_access:
+          enum:
+          - ALLOW
+          - DENY
+          title: default_access
+          type: string
+        enabled:
+          title: enabled
+          type: boolean
+        startsAt:
+          format: date-time
+          title: startsAt
+          type: string
+        endsAt:
+          format: date-time
+          title: endsAt
+          type: string
+        notes:
+          title: notes
+          type: string
+      title: RulePatchRequest
+      type: object
+    Rule:
+      example:
+        default_access: ALLOW
+        notes: notes
+        updatedBy: updatedBy
+        startsAt: 2000-01-23T04:56:07.000+00:00
+        invokerExceptions:
+          invokerOnboardedByUser:
+          - invokerOnboardedByUser
+          - invokerOnboardedByUser
+          apiInvokerId:
+          - apiInvokerId
+          - apiInvokerId
+        providerSelector:
+          apiProviderId:
+          - apiProviderId
+          - apiProviderId
+          apiName:
+          - apiName
+          - apiName
+          userName: 
+          - userName
+          aefId:
+          - aefId
+          - aefId
+          apiId:
+          - apiId
+          - apiId
+        ruleId: ruleId
+        endsAt: 2000-01-23T04:56:07.000+00:00
+        enabled: true
+        updatedAt: 2000-01-23T04:56:07.000+00:00
+      properties:
+        ruleId:
+          title: ruleId
+          type: string
+        providerSelector:
+          $ref: '#/components/schemas/ProviderSelector'
+        invokerExceptions:
+          $ref: '#/components/schemas/InvokerSelector'
+        default_access:
+          enum:
+          - ALLOW
+          - DENY
+          title: default_access
+          type: string
+        enabled:
+          default: true
+          title: enabled
+          type: boolean
+        startsAt:
+          format: date-time
+          title: startsAt
+          type: string
+        endsAt:
+          format: date-time
+          title: endsAt
+          type: string
+        notes:
+          title: notes
+          type: string
+        updatedAt:
+          format: date-time
+          title: updatedAt
+          type: string
+        updatedBy:
+          title: updatedBy
+          type: string
+      required:
+      - default_access
+      - providerSelector
+      - ruleId
+      title: Rule
+      type: object
+    PatchProviderSelector:
+      additionalProperties: false
+      description: |
+        Patch Provider-side selector.
+      example:
+        apiProviderId:
+        - apiProviderId
+        - apiProviderId
+        apiName:
+        - apiName
+        - apiName
+        aefId:
+        - aefId
+        - aefId
+        apiId:
+        - apiId
+        - apiId
+        userName: 
+        - userName
+      properties:
+        userName:
+          minLength: 1
+          title: userName
+          type: string
+        apiProviderId:
+          items:
+            type: string
+          minItems: 0
+          title: apiProviderId
+          type: array
+          uniqueItems: true
+        apiName:
+          items:
+            type: string
+          minItems: 0
+          title: apiName
+          type: array
+          uniqueItems: true
+        apiId:
+          items:
+            type: string
+          minItems: 0
+          title: apiId
+          type: array
+          uniqueItems: true
+        aefId:
+          items:
+            type: string
+          minItems: 0
+          title: aefId
+          type: array
+          uniqueItems: true
+      title: PatchProviderSelector
+      type: object
+    ProviderSelector:
+      additionalProperties: false
+      description: |
+        Provider-side selector. Arrays apply OR within the field; AND across fields.
+        At least one of these fields must be present.
+      example:
+        apiProviderId:
+        - apiProviderId
+        - apiProviderId
+        apiName:
+        - apiName
+        - apiName
+        userName: 
+          - userName
+        aefId:
+        - aefId
+        - aefId
+        apiId:
+        - apiId
+        - apiId
+      properties:
+        userName:
+          minLength: 1
+          title: userName
+          type: string
+        apiProviderId:
+          items:
+            type: string
+          minItems: 0
+          title: apiProviderId
+          type: array
+          uniqueItems: true
+        apiName:
+          items:
+            type: string
+          minItems: 0
+          title: apiName
+          type: array
+          uniqueItems: true
+        apiId:
+          items:
+            type: string
+          minItems: 0
+          title: apiId
+          type: array
+          uniqueItems: true
+        aefId:
+          items:
+            type: string
+          minItems: 0
+          title: aefId
+          type: array
+          uniqueItems: true
+      required:
+      - userName
+      title: ProviderSelector
+      type: object
+    InvokerSelector:
+      additionalProperties: false
+      description: Invoker-side selector used for exceptions. Optional; arrays use
+        OR within the field; AND across fields.
+      example:
+        invokerOnboardedByUser:
+        - invokerOnboardedByUser
+        - invokerOnboardedByUser
+        apiInvokerId:
+        - apiInvokerId
+        - apiInvokerId
+      properties:
+        invokerOnboardedByUser:
+          items:
+            type: string
+          minItems: 0
+          title: invokerOnboardedByUser
+          type: array
+          uniqueItems: true
+        apiInvokerId:
+          items:
+            type: string
+          minItems: 0
+          title: apiInvokerId
+          type: array
+          uniqueItems: true
+      title: InvokerSelector
+      type: object
+    DiscoveredAPIs:
+      example:
+        serviceAPIDescriptions:
+        - serviceAPICategory: serviceAPICategory
+          ccfId: ccfId
+          apiName: apiName
+          shareableInfo:
+            capifProvDoms:
+            - capifProvDoms
+            - capifProvDoms
+            isShareable: true
+          apiProvName: apiProvName
+          supportedFeatures: supportedFeatures
+          description: description
+          apiSuppFeats: apiSuppFeats
+          apiId: apiId
+          apiStatus:
+            aefIds:
+            - aefIds
+            - aefIds
+          aefProfiles:
+          - protocol: HTTP_1_1
+            grantTypes:
+            - CLIENT_CREDENTIALS
+            - CLIENT_CREDENTIALS
+            ueIpRange:
+              ueIpv4AddrRanges:
+              - start: start
+                end: end
+              - start: start
+                end: end
+            securityMethods:
+            - PSK
+            - PSK
+            versions:
+            - apiVersion: apiVersion
+              resources:
+              - operations:
+                - GET
+                - GET
+                commType: REQUEST_RESPONSE
+                description: description
+                resourceName: resourceName
+                custOpName: custOpName
+                uri: uri
+              - operations:
+                - GET
+                - GET
+                commType: REQUEST_RESPONSE
+                description: description
+                resourceName: resourceName
+                custOpName: custOpName
+                uri: uri
+              custOperations:
+              - operations:
+                - null
+                - null
+                commType: null
+                description: description
+                custOpName: custOpName
+              - operations:
+                - null
+                - null
+                commType: null
+                description: description
+                custOpName: custOpName
+              expiry: 2000-01-23T04:56:07.000+00:00
+            - apiVersion: apiVersion
+              resources:
+              - operations:
+                - GET
+                - GET
+                commType: REQUEST_RESPONSE
+                description: description
+                resourceName: resourceName
+                custOpName: custOpName
+                uri: uri
+              - operations:
+                - GET
+                - GET
+                commType: REQUEST_RESPONSE
+                description: description
+                resourceName: resourceName
+                custOpName: custOpName
+                uri: uri
+              custOperations:
+              - operations:
+                - null
+                - null
+                commType: null
+                description: description
+                custOpName: custOpName
+              - operations:
+                - null
+                - null
+                commType: null
+                description: description
+                custOpName: custOpName
+              expiry: 2000-01-23T04:56:07.000+00:00
+            dataFormat: JSON
+            domainName: domainName
+            aefLocation:
+              dcId: dcId
+            aefId: aefId
+            interfaceDescriptions:
+            - ipv6Addr: ipv6Addr
+              grantTypes:
+              - null
+              - null
+              securityMethods:
+              - null
+              - null
+              fqdn: fqdn
+              port: 0
+              apiPrefix: apiPrefix
+              ipv4Addr: ipv4Addr
+            - ipv6Addr: ipv6Addr
+              grantTypes:
+              - null
+              - null
+              securityMethods:
+              - null
+              - null
+              fqdn: fqdn
+              port: 0
+              apiPrefix: apiPrefix
+              ipv4Addr: ipv4Addr
+            serviceKpis:
+              avalMem: avalMem
+              avalStor: avalStor
+              avalComp: avalComp
+              maxRestime: 1
+              availability: 5
+              maxReqRate: 6
+          - protocol: HTTP_1_1
+            grantTypes:
+            - CLIENT_CREDENTIALS
+            - CLIENT_CREDENTIALS
+            ueIpRange:
+              ueIpv4AddrRanges:
+              - start: start
+                end: end
+              - start: start
+                end: end
+            securityMethods:
+            - PSK
+            - PSK
+            versions:
+            - apiVersion: apiVersion
+              resources:
+              - operations:
+                - GET
+                - GET
+                commType: REQUEST_RESPONSE
+                description: description
+                resourceName: resourceName
+                custOpName: custOpName
+                uri: uri
+              - operations:
+                - GET
+                - GET
+                commType: REQUEST_RESPONSE
+                description: description
+                resourceName: resourceName
+                custOpName: custOpName
+                uri: uri
+              custOperations:
+              - operations:
+                - null
+                - null
+                commType: null
+                description: description
+                custOpName: custOpName
+              - operations:
+                - null
+                - null
+                commType: null
+                description: description
+                custOpName: custOpName
+              expiry: 2000-01-23T04:56:07.000+00:00
+            - apiVersion: apiVersion
+              resources:
+              - operations:
+                - GET
+                - GET
+                commType: REQUEST_RESPONSE
+                description: description
+                resourceName: resourceName
+                custOpName: custOpName
+                uri: uri
+              - operations:
+                - GET
+                - GET
+                commType: REQUEST_RESPONSE
+                description: description
+                resourceName: resourceName
+                custOpName: custOpName
+                uri: uri
+              custOperations:
+              - operations:
+                - null
+                - null
+                commType: null
+                description: description
+                custOpName: custOpName
+              - operations:
+                - null
+                - null
+                commType: null
+                description: description
+                custOpName: custOpName
+              expiry: 2000-01-23T04:56:07.000+00:00
+            dataFormat: JSON
+            domainName: domainName
+            aefLocation:
+              dcId: dcId
+            aefId: aefId
+            interfaceDescriptions:
+            - ipv6Addr: ipv6Addr
+              grantTypes:
+              - null
+              - null
+              securityMethods:
+              - null
+              - null
+              fqdn: fqdn
+              port: 0
+              apiPrefix: apiPrefix
+              ipv4Addr: ipv4Addr
+            - ipv6Addr: ipv6Addr
+              grantTypes:
+              - null
+              - null
+              securityMethods:
+              - null
+              - null
+              fqdn: fqdn
+              port: 0
+              apiPrefix: apiPrefix
+              ipv4Addr: ipv4Addr
+            serviceKpis:
+              avalMem: avalMem
+              avalStor: avalStor
+              avalComp: avalComp
+              maxRestime: 1
+              availability: 5
+              maxReqRate: 6
+          pubApiPath:
+            ccfIds:
+            - ccfIds
+            - ccfIds
+        - serviceAPICategory: serviceAPICategory
+          ccfId: ccfId
+          apiName: apiName
+          shareableInfo:
+            capifProvDoms:
+            - capifProvDoms
+            - capifProvDoms
+            isShareable: true
+          apiProvName: apiProvName
+          supportedFeatures: supportedFeatures
+          description: description
+          apiSuppFeats: apiSuppFeats
+          apiId: apiId
+          apiStatus:
+            aefIds:
+            - aefIds
+            - aefIds
+          aefProfiles:
+          - protocol: HTTP_1_1
+            grantTypes:
+            - CLIENT_CREDENTIALS
+            - CLIENT_CREDENTIALS
+            ueIpRange:
+              ueIpv4AddrRanges:
+              - start: start
+                end: end
+              - start: start
+                end: end
+            securityMethods:
+            - PSK
+            - PSK
+            versions:
+            - apiVersion: apiVersion
+              resources:
+              - operations:
+                - GET
+                - GET
+                commType: REQUEST_RESPONSE
+                description: description
+                resourceName: resourceName
+                custOpName: custOpName
+                uri: uri
+              - operations:
+                - GET
+                - GET
+                commType: REQUEST_RESPONSE
+                description: description
+                resourceName: resourceName
+                custOpName: custOpName
+                uri: uri
+              custOperations:
+              - operations:
+                - null
+                - null
+                commType: null
+                description: description
+                custOpName: custOpName
+              - operations:
+                - null
+                - null
+                commType: null
+                description: description
+                custOpName: custOpName
+              expiry: 2000-01-23T04:56:07.000+00:00
+            - apiVersion: apiVersion
+              resources:
+              - operations:
+                - GET
+                - GET
+                commType: REQUEST_RESPONSE
+                description: description
+                resourceName: resourceName
+                custOpName: custOpName
+                uri: uri
+              - operations:
+                - GET
+                - GET
+                commType: REQUEST_RESPONSE
+                description: description
+                resourceName: resourceName
+                custOpName: custOpName
+                uri: uri
+              custOperations:
+              - operations:
+                - null
+                - null
+                commType: null
+                description: description
+                custOpName: custOpName
+              - operations:
+                - null
+                - null
+                commType: null
+                description: description
+                custOpName: custOpName
+              expiry: 2000-01-23T04:56:07.000+00:00
+            dataFormat: JSON
+            domainName: domainName
+            aefLocation:
+              dcId: dcId
+            aefId: aefId
+            interfaceDescriptions:
+            - ipv6Addr: ipv6Addr
+              grantTypes:
+              - null
+              - null
+              securityMethods:
+              - null
+              - null
+              fqdn: fqdn
+              port: 0
+              apiPrefix: apiPrefix
+              ipv4Addr: ipv4Addr
+            - ipv6Addr: ipv6Addr
+              grantTypes:
+              - null
+              - null
+              securityMethods:
+              - null
+              - null
+              fqdn: fqdn
+              port: 0
+              apiPrefix: apiPrefix
+              ipv4Addr: ipv4Addr
+            serviceKpis:
+              avalMem: avalMem
+              avalStor: avalStor
+              avalComp: avalComp
+              maxRestime: 1
+              availability: 5
+              maxReqRate: 6
+          - protocol: HTTP_1_1
+            grantTypes:
+            - CLIENT_CREDENTIALS
+            - CLIENT_CREDENTIALS
+            ueIpRange:
+              ueIpv4AddrRanges:
+              - start: start
+                end: end
+              - start: start
+                end: end
+            securityMethods:
+            - PSK
+            - PSK
+            versions:
+            - apiVersion: apiVersion
+              resources:
+              - operations:
+                - GET
+                - GET
+                commType: REQUEST_RESPONSE
+                description: description
+                resourceName: resourceName
+                custOpName: custOpName
+                uri: uri
+              - operations:
+                - GET
+                - GET
+                commType: REQUEST_RESPONSE
+                description: description
+                resourceName: resourceName
+                custOpName: custOpName
+                uri: uri
+              custOperations:
+              - operations:
+                - null
+                - null
+                commType: null
+                description: description
+                custOpName: custOpName
+              - operations:
+                - null
+                - null
+                commType: null
+                description: description
+                custOpName: custOpName
+              expiry: 2000-01-23T04:56:07.000+00:00
+            - apiVersion: apiVersion
+              resources:
+              - operations:
+                - GET
+                - GET
+                commType: REQUEST_RESPONSE
+                description: description
+                resourceName: resourceName
+                custOpName: custOpName
+                uri: uri
+              - operations:
+                - GET
+                - GET
+                commType: REQUEST_RESPONSE
+                description: description
+                resourceName: resourceName
+                custOpName: custOpName
+                uri: uri
+              custOperations:
+              - operations:
+                - null
+                - null
+                commType: null
+                description: description
+                custOpName: custOpName
+              - operations:
+                - null
+                - null
+                commType: null
+                description: description
+                custOpName: custOpName
+              expiry: 2000-01-23T04:56:07.000+00:00
+            dataFormat: JSON
+            domainName: domainName
+            aefLocation:
+              dcId: dcId
+            aefId: aefId
+            interfaceDescriptions:
+            - ipv6Addr: ipv6Addr
+              grantTypes:
+              - null
+              - null
+              securityMethods:
+              - null
+              - null
+              fqdn: fqdn
+              port: 0
+              apiPrefix: apiPrefix
+              ipv4Addr: ipv4Addr
+            - ipv6Addr: ipv6Addr
+              grantTypes:
+              - null
+              - null
+              securityMethods:
+              - null
+              - null
+              fqdn: fqdn
+              port: 0
+              apiPrefix: apiPrefix
+              ipv4Addr: ipv4Addr
+            serviceKpis:
+              avalMem: avalMem
+              avalStor: avalStor
+              avalComp: avalComp
+              maxRestime: 1
+              availability: 5
+              maxReqRate: 6
+          pubApiPath:
+            ccfIds:
+            - ccfIds
+            - ccfIds
+        suppFeat: suppFeat
+      properties:
+        serviceAPIDescriptions:
+          items:
+            $ref: '#/components/schemas/ServiceAPIDescription'
+          minItems: 1
+          title: serviceAPIDescriptions
+          type: array
+        suppFeat:
+          pattern: "^[A-Fa-f0-9]*$"
+          title: SupportedFeatures
+          type: string
+      title: DiscoveredAPIs
+      type: object
+    ServiceAPIDescription:
+      example:
+        serviceAPICategory: serviceAPICategory
+        ccfId: ccfId
+        apiName: apiName
+        shareableInfo:
+          capifProvDoms:
+          - capifProvDoms
+          - capifProvDoms
+          isShareable: true
+        apiProvName: apiProvName
+        supportedFeatures: supportedFeatures
+        description: description
+        apiSuppFeats: apiSuppFeats
+        apiId: apiId
+        apiStatus:
+          aefIds:
+          - aefIds
+          - aefIds
+        aefProfiles:
+        - protocol: HTTP_1_1
+          grantTypes:
+          - CLIENT_CREDENTIALS
+          - CLIENT_CREDENTIALS
+          ueIpRange:
+            ueIpv4AddrRanges:
+            - start: start
+              end: end
+            - start: start
+              end: end
+          securityMethods:
+          - PSK
+          - PSK
+          versions:
+          - apiVersion: apiVersion
+            resources:
+            - operations:
+              - GET
+              - GET
+              commType: REQUEST_RESPONSE
+              description: description
+              resourceName: resourceName
+              custOpName: custOpName
+              uri: uri
+            - operations:
+              - GET
+              - GET
+              commType: REQUEST_RESPONSE
+              description: description
+              resourceName: resourceName
+              custOpName: custOpName
+              uri: uri
+            custOperations:
+            - operations:
+              - null
+              - null
+              commType: null
+              description: description
+              custOpName: custOpName
+            - operations:
+              - null
+              - null
+              commType: null
+              description: description
+              custOpName: custOpName
+            expiry: 2000-01-23T04:56:07.000+00:00
+          - apiVersion: apiVersion
+            resources:
+            - operations:
+              - GET
+              - GET
+              commType: REQUEST_RESPONSE
+              description: description
+              resourceName: resourceName
+              custOpName: custOpName
+              uri: uri
+            - operations:
+              - GET
+              - GET
+              commType: REQUEST_RESPONSE
+              description: description
+              resourceName: resourceName
+              custOpName: custOpName
+              uri: uri
+            custOperations:
+            - operations:
+              - null
+              - null
+              commType: null
+              description: description
+              custOpName: custOpName
+            - operations:
+              - null
+              - null
+              commType: null
+              description: description
+              custOpName: custOpName
+            expiry: 2000-01-23T04:56:07.000+00:00
+          dataFormat: JSON
+          domainName: domainName
+          aefLocation:
+            dcId: dcId
+          aefId: aefId
+          interfaceDescriptions:
+          - ipv6Addr: ipv6Addr
+            grantTypes:
+            - null
+            - null
+            securityMethods:
+            - null
+            - null
+            fqdn: fqdn
+            port: 0
+            apiPrefix: apiPrefix
+            ipv4Addr: ipv4Addr
+          - ipv6Addr: ipv6Addr
+            grantTypes:
+            - null
+            - null
+            securityMethods:
+            - null
+            - null
+            fqdn: fqdn
+            port: 0
+            apiPrefix: apiPrefix
+            ipv4Addr: ipv4Addr
+          serviceKpis:
+            avalMem: avalMem
+            avalStor: avalStor
+            avalComp: avalComp
+            maxRestime: 1
+            availability: 5
+            maxReqRate: 6
+        - protocol: HTTP_1_1
+          grantTypes:
+          - CLIENT_CREDENTIALS
+          - CLIENT_CREDENTIALS
+          ueIpRange:
+            ueIpv4AddrRanges:
+            - start: start
+              end: end
+            - start: start
+              end: end
+          securityMethods:
+          - PSK
+          - PSK
+          versions:
+          - apiVersion: apiVersion
+            resources:
+            - operations:
+              - GET
+              - GET
+              commType: REQUEST_RESPONSE
+              description: description
+              resourceName: resourceName
+              custOpName: custOpName
+              uri: uri
+            - operations:
+              - GET
+              - GET
+              commType: REQUEST_RESPONSE
+              description: description
+              resourceName: resourceName
+              custOpName: custOpName
+              uri: uri
+            custOperations:
+            - operations:
+              - null
+              - null
+              commType: null
+              description: description
+              custOpName: custOpName
+            - operations:
+              - null
+              - null
+              commType: null
+              description: description
+              custOpName: custOpName
+            expiry: 2000-01-23T04:56:07.000+00:00
+          - apiVersion: apiVersion
+            resources:
+            - operations:
+              - GET
+              - GET
+              commType: REQUEST_RESPONSE
+              description: description
+              resourceName: resourceName
+              custOpName: custOpName
+              uri: uri
+            - operations:
+              - GET
+              - GET
+              commType: REQUEST_RESPONSE
+              description: description
+              resourceName: resourceName
+              custOpName: custOpName
+              uri: uri
+            custOperations:
+            - operations:
+              - null
+              - null
+              commType: null
+              description: description
+              custOpName: custOpName
+            - operations:
+              - null
+              - null
+              commType: null
+              description: description
+              custOpName: custOpName
+            expiry: 2000-01-23T04:56:07.000+00:00
+          dataFormat: JSON
+          domainName: domainName
+          aefLocation:
+            dcId: dcId
+          aefId: aefId
+          interfaceDescriptions:
+          - ipv6Addr: ipv6Addr
+            grantTypes:
+            - null
+            - null
+            securityMethods:
+            - null
+            - null
+            fqdn: fqdn
+            port: 0
+            apiPrefix: apiPrefix
+            ipv4Addr: ipv4Addr
+          - ipv6Addr: ipv6Addr
+            grantTypes:
+            - null
+            - null
+            securityMethods:
+            - null
+            - null
+            fqdn: fqdn
+            port: 0
+            apiPrefix: apiPrefix
+            ipv4Addr: ipv4Addr
+          serviceKpis:
+            avalMem: avalMem
+            avalStor: avalStor
+            avalComp: avalComp
+            maxRestime: 1
+            availability: 5
+            maxReqRate: 6
+        pubApiPath:
+          ccfIds:
+          - ccfIds
+          - ccfIds
+      properties:
+        apiName:
+          title: apiName
+          type: string
+        apiId:
+          title: apiId
+          type: string
+        apiStatus:
+          $ref: '#/components/schemas/ApiStatus'
+        aefProfiles:
+          items:
+            $ref: '#/components/schemas/AefProfile'
+          minItems: 1
+          title: aefProfiles
+          type: array
+        description:
+          title: description
+          type: string
+        supportedFeatures:
+          pattern: "^[A-Fa-f0-9]*$"
+          title: SupportedFeatures
+          type: string
+        shareableInfo:
+          $ref: '#/components/schemas/ShareableInformation'
+        serviceAPICategory:
+          title: serviceAPICategory
+          type: string
+        apiSuppFeats:
+          pattern: "^[A-Fa-f0-9]*$"
+          title: SupportedFeatures
+          type: string
+        pubApiPath:
+          $ref: '#/components/schemas/PublishedApiPath'
+        ccfId:
+          title: ccfId
+          type: string
+        apiProvName:
+          title: apiProvName
+          type: string
+      required:
+      - apiName
+      title: ServiceAPIDescription
+      type: object
+    AefProfile:
+      example:
+        protocol: HTTP_1_1
+        grantTypes:
+        - CLIENT_CREDENTIALS
+        - CLIENT_CREDENTIALS
+        ueIpRange:
+          ueIpv4AddrRanges:
+          - start: start
+            end: end
+          - start: start
+            end: end
+        securityMethods:
+        - PSK
+        - PSK
+        versions:
+        - apiVersion: apiVersion
+          resources:
+          - operations:
+            - GET
+            - GET
+            commType: REQUEST_RESPONSE
+            description: description
+            resourceName: resourceName
+            custOpName: custOpName
+            uri: uri
+          - operations:
+            - GET
+            - GET
+            commType: REQUEST_RESPONSE
+            description: description
+            resourceName: resourceName
+            custOpName: custOpName
+            uri: uri
+          custOperations:
+          - operations:
+            - null
+            - null
+            commType: null
+            description: description
+            custOpName: custOpName
+          - operations:
+            - null
+            - null
+            commType: null
+            description: description
+            custOpName: custOpName
+          expiry: 2000-01-23T04:56:07.000+00:00
+        - apiVersion: apiVersion
+          resources:
+          - operations:
+            - GET
+            - GET
+            commType: REQUEST_RESPONSE
+            description: description
+            resourceName: resourceName
+            custOpName: custOpName
+            uri: uri
+          - operations:
+            - GET
+            - GET
+            commType: REQUEST_RESPONSE
+            description: description
+            resourceName: resourceName
+            custOpName: custOpName
+            uri: uri
+          custOperations:
+          - operations:
+            - null
+            - null
+            commType: null
+            description: description
+            custOpName: custOpName
+          - operations:
+            - null
+            - null
+            commType: null
+            description: description
+            custOpName: custOpName
+          expiry: 2000-01-23T04:56:07.000+00:00
+        dataFormat: JSON
+        domainName: domainName
+        aefLocation:
+          dcId: dcId
+        aefId: aefId
+        interfaceDescriptions:
+        - ipv6Addr: ipv6Addr
+          grantTypes:
+          - null
+          - null
+          securityMethods:
+          - null
+          - null
+          fqdn: fqdn
+          port: 0
+          apiPrefix: apiPrefix
+          ipv4Addr: ipv4Addr
+        - ipv6Addr: ipv6Addr
+          grantTypes:
+          - null
+          - null
+          securityMethods:
+          - null
+          - null
+          fqdn: fqdn
+          port: 0
+          apiPrefix: apiPrefix
+          ipv4Addr: ipv4Addr
+        serviceKpis:
+          avalMem: avalMem
+          avalStor: avalStor
+          avalComp: avalComp
+          maxRestime: 1
+          availability: 5
+          maxReqRate: 6
+      properties:
+        aefId:
+          title: aefId
+          type: string
+        versions:
+          items:
+            $ref: '#/components/schemas/Version'
+          minItems: 1
+          title: versions
+          type: array
+        protocol:
+          $ref: '#/components/schemas/Protocol'
+        dataFormat:
+          $ref: '#/components/schemas/DataFormat'
+        securityMethods:
+          items:
+            $ref: '#/components/schemas/SecurityMethod'
+          title: securityMethods
+          type: array
+        grantTypes:
+          items:
+            $ref: '#/components/schemas/OAuthGrantType'
+          title: grantTypes
+          type: array
+        domainName:
+          title: domainName
+          type: string
+        interfaceDescriptions:
+          items:
+            $ref: '#/components/schemas/InterfaceDescription'
+          title: interfaceDescriptions
+          type: array
+        aefLocation:
+          $ref: '#/components/schemas/AefLocation'
+        serviceKpis:
+          $ref: '#/components/schemas/ServiceKpis'
+        ueIpRange:
+          $ref: '#/components/schemas/IpAddrRange'
+      required:
+      - aefId
+      - versions
+      title: AefProfile
+      type: object
+    Version:
+      example:
+        apiVersion: apiVersion
+        resources:
+        - operations:
+          - GET
+          - GET
+          commType: REQUEST_RESPONSE
+          description: description
+          resourceName: resourceName
+          custOpName: custOpName
+          uri: uri
+        - operations:
+          - GET
+          - GET
+          commType: REQUEST_RESPONSE
+          description: description
+          resourceName: resourceName
+          custOpName: custOpName
+          uri: uri
+        custOperations:
+        - operations:
+          - null
+          - null
+          commType: null
+          description: description
+          custOpName: custOpName
+        - operations:
+          - null
+          - null
+          commType: null
+          description: description
+          custOpName: custOpName
+        expiry: 2000-01-23T04:56:07.000+00:00
+      properties:
+        apiVersion:
+          title: apiVersion
+          type: string
+        expiry:
+          format: date-time
+          title: expiry
+          type: string
+        resources:
+          items:
+            $ref: '#/components/schemas/Resource'
+          title: resources
+          type: array
+        custOperations:
+          items:
+            $ref: '#/components/schemas/CustomOperation'
+          title: custOperations
+          type: array
+      required:
+      - apiVersion
+      title: Version
+      type: object
+    Resource:
+      example:
+        operations:
+        - GET
+        - GET
+        commType: REQUEST_RESPONSE
+        description: description
+        resourceName: resourceName
+        custOpName: custOpName
+        uri: uri
+      properties:
+        resourceName:
+          title: resourceName
+          type: string
+        commType:
+          $ref: '#/components/schemas/CommunicationType'
+        uri:
+          title: uri
+          type: string
+        custOpName:
+          title: custOpName
+          type: string
+        operations:
+          items:
+            $ref: '#/components/schemas/Operation'
+          title: operations
+          type: array
+        description:
+          title: description
+          type: string
+      required:
+      - commType
+      - resourceName
+      - uri
+      title: Resource
+      type: object
+    CustomOperation:
+      example:
+        operations:
+        - null
+        - null
+        commType: null
+        description: description
+        custOpName: custOpName
+      properties:
+        commType:
+          $ref: '#/components/schemas/CommunicationType'
+        custOpName:
+          title: custOpName
+          type: string
+        operations:
+          items:
+            $ref: '#/components/schemas/Operation'
+          title: operations
+          type: array
+        description:
+          title: description
+          type: string
+      required:
+      - commType
+      - custOpName
+      title: CustomOperation
+      type: object
+    ApiStatus:
+      example:
+        aefIds:
+        - aefIds
+        - aefIds
+      properties:
+        aefIds:
+          items:
+            type: string
+          title: aefIds
+          type: array
+      required:
+      - aefIds
+      title: ApiStatus
+      type: object
+    InterfaceDescription:
+      example:
+        ipv6Addr: ipv6Addr
+        grantTypes:
+        - null
+        - null
+        securityMethods:
+        - null
+        - null
+        fqdn: fqdn
+        port: 0
+        apiPrefix: apiPrefix
+        ipv4Addr: ipv4Addr
+      properties:
+        ipv4Addr:
+          title: ipv4Addr
+          type: string
+        ipv6Addr:
+          title: ipv6Addr
+          type: string
+        fqdn:
+          title: fqdn
+          type: string
+        port:
+          title: port
+          type: integer
+        apiPrefix:
+          title: apiPrefix
+          type: string
+        securityMethods:
+          items:
+            $ref: '#/components/schemas/SecurityMethod'
+          title: securityMethods
+          type: array
+        grantTypes:
+          items:
+            $ref: '#/components/schemas/OAuthGrantType'
+          title: grantTypes
+          type: array
+      title: InterfaceDescription
+      type: object
+    SupportedFeatures:
+      pattern: "^[A-Fa-f0-9]*$"
+      title: SupportedFeatures
+      type: string
+    CommunicationType:
+      enum:
+      - REQUEST_RESPONSE
+      - SUBSCRIBE_NOTIFY
+      title: CommunicationType
+      type: string
+    Protocol:
+      enum:
+      - HTTP_1_1
+      - HTTP_2
+      - MQTT
+      - WEBSOCKET
+      title: Protocol
+      type: string
+    DataFormat:
+      enum:
+      - JSON
+      - XML
+      - PROTOBUF3
+      title: DataFormat
+      type: string
+    Operation:
+      enum:
+      - GET
+      - POST
+      - PUT
+      - PATCH
+      - DELETE
+      title: Operation
+      type: string
+    SecurityMethod:
+      enum:
+      - PSK
+      - PKI
+      - OAUTH
+      title: SecurityMethod
+      type: string
+    OAuthGrantType:
+      enum:
+      - CLIENT_CREDENTIALS
+      - AUTHORIZATION_CODE
+      - AUTHORIZATION_CODE_WITH_PKCE
+      title: OAuthGrantType
+      type: string
+    ShareableInformation:
+      example:
+        capifProvDoms:
+        - capifProvDoms
+        - capifProvDoms
+        isShareable: true
+      properties:
+        isShareable:
+          title: isShareable
+          type: boolean
+        capifProvDoms:
+          items:
+            type: string
+          title: capifProvDoms
+          type: array
+      required:
+      - isShareable
+      title: ShareableInformation
+      type: object
+    PublishedApiPath:
+      example:
+        ccfIds:
+        - ccfIds
+        - ccfIds
+      properties:
+        ccfIds:
+          items:
+            type: string
+          title: ccfIds
+          type: array
+      title: PublishedApiPath
+      type: object
+    AefLocation:
+      example:
+        dcId: dcId
+      properties:
+        dcId:
+          title: dcId
+          type: string
+      title: AefLocation
+      type: object
+    ServiceKpis:
+      example:
+        avalMem: avalMem
+        avalStor: avalStor
+        avalComp: avalComp
+        maxRestime: 1
+        availability: 5
+        maxReqRate: 6
+      properties:
+        maxReqRate:
+          title: maxReqRate
+          type: integer
+        maxRestime:
+          title: maxRestime
+          type: integer
+        availability:
+          title: availability
+          type: integer
+        avalComp:
+          title: avalComp
+          type: string
+        avalMem:
+          title: avalMem
+          type: string
+        avalStor:
+          title: avalStor
+          type: string
+      title: ServiceKpis
+      type: object
+    IpAddrRange:
+      example:
+        ueIpv4AddrRanges:
+        - start: start
+          end: end
+        - start: start
+          end: end
+      properties:
+        ueIpv4AddrRanges:
+          items:
+            $ref: '#/components/schemas/IpAddrRange_ueIpv4AddrRanges_inner'
+          title: ueIpv4AddrRanges
+          type: array
+      title: IpAddrRange
+      type: object
+    Error:
+      example:
+        code: code
+        details:
+          key: ""
+        message: message
+      properties:
+        code:
+          title: code
+          type: string
+        message:
+          title: message
+          type: string
+        details:
+          additionalProperties: true
+          title: details
+          type: object
+      required:
+      - code
+      - message
+      title: Error
+      type: object
+    _rules_get_200_response:
+      example:
+        nextPageToken: nextPageToken
+        items:
+        - default_access: ALLOW
+          notes: notes
+          updatedBy: updatedBy
+          startsAt: 2000-01-23T04:56:07.000+00:00
+          invokerExceptions:
+            invokerOnboardedByUser:
+            - invokerOnboardedByUser
+            - invokerOnboardedByUser
+            apiInvokerId:
+            - apiInvokerId
+            - apiInvokerId
+          providerSelector:
+            apiProviderId:
+            - apiProviderId
+            - apiProviderId
+            apiName:
+            - apiName
+            - apiName
+            userName: userName
+            aefId:
+            - aefId
+            - aefId
+            apiId:
+            - apiId
+            - apiId
+          ruleId: ruleId
+          endsAt: 2000-01-23T04:56:07.000+00:00
+          enabled: true
+          updatedAt: 2000-01-23T04:56:07.000+00:00
+        - default_access: ALLOW
+          notes: notes
+          updatedBy: updatedBy
+          startsAt: 2000-01-23T04:56:07.000+00:00
+          invokerExceptions:
+            invokerOnboardedByUser:
+            - invokerOnboardedByUser
+            - invokerOnboardedByUser
+            apiInvokerId:
+            - apiInvokerId
+            - apiInvokerId
+          providerSelector:
+            apiProviderId:
+            - apiProviderId
+            - apiProviderId
+            apiName:
+            - apiName
+            - apiName
+            userName: userName
+            aefId:
+            - aefId
+            - aefId
+            apiId:
+            - apiId
+            - apiId
+          ruleId: ruleId
+          endsAt: 2000-01-23T04:56:07.000+00:00
+          enabled: true
+          updatedAt: 2000-01-23T04:56:07.000+00:00
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/Rule'
+          title: items
+          type: array
+        nextPageToken:
+          title: nextPageToken
+          type: string
+      required:
+      - items
+      title: _rules_get_200_response
+      type: object
+    IpAddrRange_ueIpv4AddrRanges_inner:
+      example:
+        start: start
+        end: end
+      properties:
+        start:
+          title: start
+          type: string
+        end:
+          title: end
+          type: string
+      title: IpAddrRange_ueIpv4AddrRanges_inner
+      type: object

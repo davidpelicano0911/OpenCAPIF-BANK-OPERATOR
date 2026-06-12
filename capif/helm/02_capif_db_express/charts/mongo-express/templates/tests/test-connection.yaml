@@ -1,0 +1,17 @@
+{{- if .Values.enabled | default false }}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "mongo-express.fullname" . }}-test-connection"
+  labels:
+    {{- include "mongo-express.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+    - name: wget
+      image: busybox
+      command: ['wget']
+      args: ['mongo-express:{{ .Values.service.port }}']
+  restartPolicy: Never
+{{- end }}

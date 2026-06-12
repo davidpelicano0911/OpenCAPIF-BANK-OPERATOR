@@ -1,0 +1,39 @@
+# -- To enable monitoring in ocf.
+# -- enabled the next services:
+# -- tempo, fluentbit, grafana, loki, otelcollector and renderer.
+# -- prometheus service must be previously installed in kubernetes
+
+tags:
+  core: true
+
+# -- With fluentbit.enabled: false. It won't be deployed
+fluentbit:
+  enabled: false
+
+# -- With grafana.enabled: false. It won't be deployed
+grafana:
+  enabled: false
+
+# -- With loki.enabled: false. It won't be deployed
+loki:
+  enabled: false
+
+# -- With otelcollector.enabled: false. It won't be deployed
+otelcollector:
+  enabled: false
+
+# -- With renderer.enabled: false. It won't be deployed
+renderer:
+  enabled: false
+
+# -- With mongo-express.enabled: false. It won't be deployed
+mongo-express:
+  enabled: false
+
+# -- With mongo-register-express.enabled: false. It won't be deployed
+mongo-register-express:
+  enabled: false
+
+# -- With mock-server.enabled: false. It won't be deployed
+mock-server:
+  enabled: false

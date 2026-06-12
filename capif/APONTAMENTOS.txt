@@ -1,0 +1,139 @@
+O projeto estava configurado para usar imagens Docker armazenadas num registry privado da ETSI, ao qual eu não tinha acesso. Por isso alterei os Dockerfiles para utilizar imagens oficiais públicas do Docker Hub com a mesma funcionalidade. Também ajustei o nginx.conf porque uma configuração específica da ETSI não era compatível com a versão oficial do Nginx. Estas alterações permitiram executar o OpenCAPIF localmente sem alterar a lógica da aplicação
+
+
+
+registry -> servidor onde ficam guardadas as imagens Docker
+
+container -> a app a correr
+
+Uma imagem Docker é um ficheiro que contém tudo o que uma aplicação precisa para funcionar:
+
+    Sistema operativo base
+    Python ou outra linguagem
+    Bibliotecas
+    Configurações
+    Código da aplicação
+
+
+O registry ETSI é público para leitura (pull). Só não consegues fazer push (enviar imagens). As tuas alterações nos Dockerfiles foram para quando quiseres fazer build localmente — se usares as imagens pré-construídas deles (que é o que acontece por omissão), não precisas das tuas alterações.
+
+cosnigo dar pull deles mas nao da para dar push
+
+
+
+------------
+
+
+
+cd ~/capif/services
+
+# Passo 1 — Limpa tudo
+./clean_capif_docker_services.sh -a
+
+# Passo 2 — Arranca tudo (já com o nginx.conf corrigido)
+./run.sh
+
+# Passo 3 — Aguarda e reinicia o register (SSL issue)
+sleep 30 && docker restart register && sleep 20
+
+# Passo 4 — Cria utilizador
+./create_users.sh -u testuser -p TestPass123
+
+# Passo 5 — Corre os testes
+ulimit -n 65536 && ./run_capif_tests.sh --include all
+O que mudou desta vez: o nginx.conf já está corrigido (comentei o log_format debug_map que usava variáveis exclusivas da imagem ETSI). O nginx vai arrancar sem crashar e os testes vão correr limpos.
+
+O ./run.sh vai fazer --build das imagens, o que vai incluir o nginx.conf corrigido na nova imagem. Os 409 desaparecem porque clean_capif_docker_services.sh -a limpa o MongoDB incluindo os utilizadores de teste que ficaram.
+
+
+
+
+----------------
+
+
+davidpelicano@davidpelicano-IdeaPad-Gaming-3-15ACH6:~/capif$ python3 demo_capif.py 
+
+══════════════════════════════════════════════════════════════
+   DEMO CAPIF — Fluxo Completo   
+   Operadora 5G  →  CAPIF  →  Banco Itaú   
+══════════════════════════════════════════════════════════════
+
+  Cenário:
+  • A Operadora 5G tem uma API de detecção de fraude: SIM Swap
+  • O Banco Itaú quer usar essa API para proteger os seus clientes
+  • O CAPIF é o porteiro — controla quem publica e quem acede
+
+  Vamos fazer os 5 passos em tempo real.
+  Os dados ficam visíveis no MongoDB em http://localhost:8082
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  PASSO 1 — Verificar que o sistema CAPIF está a correr
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ▶ Prima ENTER para executar...
+  ✓ Register responde em https://localhost:8084
+  ✓ CAPIF Core (nginx) responde em https://localhost:443
+  ▶ Abre o MongoDB: http://localhost:8082 — está vazio agora
+  ▶ Sistema composto por 23 containers Docker — 11 microserviços Flask + nginx + MongoDB + Redis + Vault
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  PASSO 2 — Registar utilizadores — Operadora 5G e Banco Itaú
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ▶ Prima ENTER para executar...[45117:45122:0605/105346.689279:ERROR:net/socket/ssl_client_socket_impl.cc:924] handshake failed; returned -1, SSL error code 1, net_error -202
+[45117:45122:0605/105346.689328:ERROR:net/socket/ssl_client_socket_impl.cc
+
+
+
+http://localhost:8082/ --> MongoDB do CAPIF Core
+    --> gurada apis publicadas, providers, invokers e ceeticiacdos
+    --> bd: capif
+    --> CRESCE NOS passos 3,4,5
+
+
+https://localhost:8083/ --> mongodb do register
+    --> users, (username,pw, enterprise)
+    --> bd: capif_users
+    --> CRESCE No passo 2
+
+
+-------------
+passo1 
+verifica se o capif está a correr
+
+passo 2
+cria 2 users
+    --> operadora 5G
+    --> banco itaú
+
+
+
+O Register é um serviço auxiliar simples que só faz uma coisa: verificar se o utilizador existe na BD e dar-lhe um passe temporário (JWT) para entrar no CAPIF Core.
+
+O CAPIF Core é o sistema real — gere APIs, Providers, Invokers, faz tudo.
+
+
+
+
+
+
+
+
+
+
+
+VERSAO FINALL
+
+/capif$ ./reset_demo.sh PARA TER TUDO APAGADO MongoDB SE CLAHAR FAZ MAIS COISAS
+
+
+davidpelicano@davidpelicano-IdeaPad-Gaming-3-15ACH6:~/capif$ python3 web_demo/app.py
+Portais da demo CAPIF:
+  Operadora → http://localhost:8090/operadora
+  Banco     → http://localhost:8090/banco
+  Ctrl+C para parar.
+
+
+DPS DA PARA VER NOS MONGO DB
+http://localhost:8082/   --> Capif Core
+http://localhost:8083/   --> Register
+

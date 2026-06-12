@@ -1,0 +1,19 @@
+{{- if .Values.enabled }}
+{{- range .Values.service }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .name }}
+  labels:
+    {{- include "otelcollector.labels" $ | nindent 4 }}
+spec:
+  type: {{ .type }}
+  ports:
+    - port: {{ .port }}
+      name: {{ .name }}
+      protocol: {{ if eq .name "otel-collector-udp" }}UDP{{ else }}TCP{{ end }}
+  selector:
+    {{- include "otelcollector.selectorLabels" $ | nindent 4 }}
+---
+{{- end }}
+{{- end }}

@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  labels:
+    {{- include "mongo-register.labels" . | nindent 8 }}
+  name: mongo-register-pvc
+spec:
+  storageClassName: {{ .Values.persistence.storageClass }}
+  accessModes: {{ .Values.persistence.accessModes }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.storage }}

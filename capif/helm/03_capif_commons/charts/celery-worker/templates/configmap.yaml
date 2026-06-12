@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: celery-worker-configmap
+data:
+  config.yaml: |
+    mongo: {
+      'user': '{{ .Values.env.mongoInitdbRootUsername }}',
+      'password': '{{ .Values.env.mongoInitdbRootPassword }}',
+      'db': 'capif',
+      'notifications_col': 'notifications',
+      'host': 'mongo',
+      'port': "27017"
+    }

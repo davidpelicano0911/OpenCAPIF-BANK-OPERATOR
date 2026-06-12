@@ -1,0 +1,37 @@
+{{- if .Values.enabled | default false }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: open-telemetry-configmap
+data:
+  otel-collector-config.yaml: |
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:55680
+          http:
+            endpoint: 0.0.0.0:4318
+
+    processors:
+      batch:
+
+
+    exporters:
+      logging:
+        loglevel: debug
+      otlp:
+        #timeout: 60s
+        endpoint: {{ .Values.configMap.tempoEndpoint }}
+        tls:
+          insecure: true
+
+
+    service:
+      pipelines:
+        traces:
+          receivers: [otlp]
+          processors: [batch]
+          # exporters: [otlp]
+          exporters: [otlp]
+{{- end }}

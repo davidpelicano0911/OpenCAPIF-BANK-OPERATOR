@@ -1,0 +1,482 @@
+openapi: 3.0.1
+info:
+  description: |
+    CAPIF Helper Configuration API. Allows reading and modifying the runtime configuration
+    stored in MongoDB (ACL policy, certificate expiration, security priorities, etc).
+  title: Helper Configuration API
+  version: 1.0.0
+servers:
+- url: "{apiRoot}/configuration"
+  variables:
+    apiRoot:
+      default: http://localhost:8080
+      description: Base URL of the Helper service.
+paths:
+  /addNewConfigSetting:
+    patch:
+      description: Adds a brand new top-level category.
+      operationId: dynamic_config_controller_add_new_configuration
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfigCategoryCreateRequest'
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CapifConfiguration'
+          description: Category added
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+          description: Bad request
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+          description: Internal server error
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+          description: Generic error response
+      summary: Add new configuration category
+      x-openapi-router-controller: configuration.controllers.default_controller
+  /addNewConfiguration:
+    post:
+      description: Adds a new key/value inside an existing category using "param_path"
+        and "new_value".
+      operationId: dynamic_config_controller_add_new_config_setting
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfigParamUpdateRequest'
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CapifConfiguration'
+          description: Setting added
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+          description: Bad request
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+          description: Internal server error
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+          description: Generic error response
+      summary: Add new config setting at path
+      x-openapi-router-controller: configuration.controllers.default_controller
+  /getConfiguration:
+    get:
+      description: Returns the entire CAPIF configuration document.
+      operationId: configuration_controller_get_configuration
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CapifConfiguration'
+          description: Current configuration
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+          description: Internal server error
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+          description: Generic error response
+      summary: Read full configuration
+      x-openapi-router-controller: configuration.controllers.default_controller
+  /removeConfigCategory:
+    delete:
+      description: Deletes an entire top-level category by name.
+      operationId: dynamic_config_controller_remove_config_category
+      parameters:
+      - description: Configuration path to remove
+        explode: true
+        in: query
+        name: config_path
+        required: true
+        schema:
+          type: string
+        style: form
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CapifConfiguration'
+          description: Category removed
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+          description: Bad request
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+          description: Internal server error
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+          description: Generic error response
+      summary: Remove configuration category
+      x-openapi-router-controller: configuration.controllers.default_controller
+  /removeConfigParam:
+    delete:
+      description: Deletes a leaf parameter by dotted path.
+      operationId: dynamic_config_controller_remove_config_param
+      parameters:
+      - description: Parameter path to remove
+        explode: true
+        in: query
+        name: param_path
+        required: true
+        schema:
+          type: string
+        style: form
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CapifConfiguration'
+          description: Parameter removed
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+          description: Bad request
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+          description: Internal server error
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+          description: Generic error response
+      summary: Remove config parameter
+      x-openapi-router-controller: configuration.controllers.default_controller
+  /replaceConfiguration:
+    put:
+      description: Replaces the configuration document with a new one.
+      operationId: dynamic_config_controller_replace_configuration
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CapifConfiguration'
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CapifConfiguration'
+          description: Updated configuration
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+          description: Bad request
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+          description: Internal server error
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+          description: Generic error response
+      summary: Replace entire configuration
+      x-openapi-router-controller: configuration.controllers.default_controller
+  /updateConfigParam:
+    patch:
+      description: Updates a single setting inside the configuration using a dotted
+        path selector.
+      operationId: dynamic_config_controller_update_config_param
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfigParamUpdateRequest'
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CapifConfiguration'
+          description: Parameter updated
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+          description: Bad request
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+          description: Internal server error
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericError'
+          description: Generic error response
+      summary: Update single config parameter
+      x-openapi-router-controller: configuration.controllers.default_controller
+components:
+  responses:
+    BadRequest:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/GenericError'
+      description: Bad request
+    InternalError:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/GenericError'
+      description: Internal server error
+    GenericError:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/GenericError'
+      description: Generic error response
+  schemas:
+    CapifConfiguration:
+      additionalProperties: true
+      description: CAPIF runtime configuration document.
+      example:
+        config_name: default
+        settings:
+        - security_method_priority:
+            psk: 3
+            oauth: 1
+            pki: 2
+          acl_policy_settings:
+            allowed_invocations_time_range_days: 365
+            allowed_invocations_per_second: "5"
+            allowed_total_invocations: "5"
+          certificates_expiry:
+            ttl_superadmin_cert: 4300h
+            ttl_invoker_cert: 4300h
+            ttl_provider_cert: 4300h
+        - security_method_priority:
+            psk: 3
+            oauth: 1
+            pki: 2
+          acl_policy_settings:
+            allowed_invocations_time_range_days: 365
+            allowed_invocations_per_second: "5"
+            allowed_total_invocations: "5"
+          certificates_expiry:
+            ttl_superadmin_cert: 4300h
+            ttl_invoker_cert: 4300h
+            ttl_provider_cert: 4300h
+        version: "1.0"
+      properties:
+        config_name:
+          description: Configuration name
+          example: default
+          type: string
+        version:
+          description: configuration version
+          example: "1.0"
+          type: string
+        settings:
+          items:
+            $ref: '#/components/schemas/Settings'
+          type: object
+      title: CapifConfiguration
+      type: object
+    ConfigParamUpdateRequest:
+      example:
+        param_path: param_path
+        new_value: ""
+      properties:
+        param_path:
+          description: Dotted path to the configuration value to update.
+          title: param_path
+          type: string
+        new_value:
+          description: New value for the configuration parameter.
+          title: new_value
+      required:
+      - new_value
+      - param_path
+      title: ConfigParamUpdateRequest
+      type: object
+    ConfigCategoryCreateRequest:
+      example:
+        category_values:
+          key: ""
+        category_name: category_name
+      properties:
+        category_name:
+          description: Name of the new configuration category.
+          title: category_name
+          type: string
+        category_values:
+          additionalProperties: true
+          description: Key/value pairs that compose the new category.
+          title: category_values
+          type: object
+      required:
+      - category_name
+      - category_values
+      title: ConfigCategoryCreateRequest
+      type: object
+    GenericError:
+      example:
+        code: code
+        message: message
+      properties:
+        code:
+          title: code
+          type: string
+        message:
+          title: message
+          type: string
+      required:
+      - code
+      - message
+      title: GenericError
+      type: object
+    Settings:
+      description: Configuration Settings
+      example:
+        security_method_priority:
+          psk: 3
+          oauth: 1
+          pki: 2
+        acl_policy_settings:
+          allowed_invocations_time_range_days: 365
+          allowed_invocations_per_second: "5"
+          allowed_total_invocations: "5"
+        certificates_expiry:
+          ttl_superadmin_cert: 4300h
+          ttl_invoker_cert: 4300h
+          ttl_provider_cert: 4300h
+      properties:
+        certificates_expiry:
+          $ref: '#/components/schemas/Settings_certificates_expiry'
+        security_method_priority:
+          $ref: '#/components/schemas/Settings_security_method_priority'
+        acl_policy_settings:
+          $ref: '#/components/schemas/Settings_acl_policy_settings'
+      title: Settings
+      type: object
+    Settings_certificates_expiry:
+      description: Expiry configuration for certificates
+      example:
+        ttl_superadmin_cert: 4300h
+        ttl_invoker_cert: 4300h
+        ttl_provider_cert: 4300h
+      properties:
+        ttl_superadmin_cert:
+          description: ttl for superadmin certificates
+          example: 4300h
+          title: ttl_superadmin_cert
+          type: string
+        ttl_invoker_cert:
+          description: ttl for invoker certificates
+          example: 4300h
+          title: ttl_invoker_cert
+          type: string
+        ttl_provider_cert:
+          description: ttl for provider certificates
+          example: 4300h
+          title: ttl_provider_cert
+          type: string
+      title: Settings_certificates_expiry
+      type: object
+    Settings_security_method_priority:
+      description: priority to follow in granting the security method
+      example:
+        psk: 3
+        oauth: 1
+        pki: 2
+      properties:
+        oauth:
+          example: 1
+          title: oauth
+          type: integer
+        pki:
+          example: 2
+          title: pki
+          type: integer
+        psk:
+          example: 3
+          title: psk
+          type: integer
+      title: Settings_security_method_priority
+      type: object
+    Settings_acl_policy_settings:
+      description: default access policies
+      example:
+        allowed_invocations_time_range_days: 365
+        allowed_invocations_per_second: "5"
+        allowed_total_invocations: "5"
+      properties:
+        allowed_total_invocations:
+          description: total number of requests the invoker can make
+          example: "5"
+          title: allowed_total_invocations
+          type: string
+        allowed_invocations_per_second:
+          description: total number of requests the invoker can make per second
+          example: "5"
+          title: allowed_invocations_per_second
+          type: string
+        allowed_invocations_time_range_days:
+          description: time range when an invoker can make requests
+          example: 365
+          title: allowed_invocations_time_range_days
+          type: integer
+      title: Settings_acl_policy_settings
+      type: object

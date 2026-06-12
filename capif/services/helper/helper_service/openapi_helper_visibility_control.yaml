@@ -1,0 +1,536 @@
+openapi: 3.0.3
+info:
+  title: OpenCAPIF Access Control
+  version: 1.0.0
+  description: |
+    Access-control API to manage visibility rules and evaluate decisions for API discovery and
+    security-context access within OpenCAPIF. This API controls whether APIs are visible to invokers
+    (discovery) and whether invokers are allowed to create a security context to access them.
+    - Rules are global and evaluated with "more specific wins" precedence.
+    - If no rule matches, the decision uses OpenCAPIF's global default (outside this API).
+    - Provider selector is mandatory in rules and must contain at least one selector field.
+servers:
+  - url: https://capif.example.com/access-control
+    description: Production
+  - url: https://sandbox.capif.example.com/access-control
+    description: Sandbox
+
+tags:
+  - name: Rules
+    description: Manage visibility rules
+  - name: Decision
+    description: Evaluate discovery and access decisions
+
+paths:
+  /rules:
+    get:
+      tags: [Rules]
+      summary: List rules
+      responses:
+        '200':
+          description: List of rules
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Rule'
+                  nextPageToken:
+                    type: string
+                required: [items]
+    post:
+      tags: [Rules]
+      summary: Create a rule
+      description: Server generates the ruleId. Provider selector must include at least one field.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RuleCreateRequest'
+            examples:
+              allow_except_some_invokers:
+                value:
+                  providerSelector:
+                    userName: "userA"
+                    apiProviderId: [ "capif-prov-01", "capif-prov-02" ]
+                    apiName: [ "apiName-001" ]
+                    apiId: [ "apiId-001" ]
+                    aefId: [ "aef-001" ]
+                  invokerExceptions:
+                    apiInvokerId: [ "invk-123", "invk-999" ]
+                  default_access: ALLOW
+                  enabled: true
+      responses:
+        '201':
+          description: Rule created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Rule'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /rules/{ruleId}:
+    get:
+      tags: [Rules]
+      summary: Get a rule
+      parameters:
+        - $ref: '#/components/parameters/RuleId'
+      responses:
+        '200':
+          description: Rule
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Rule'
+        '404':
+          description: Rule not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    patch:
+      tags: [Rules]
+      summary: Update a rule (partial)
+      parameters:
+        - $ref: '#/components/parameters/RuleId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RulePatchRequest'
+      responses:
+        '200':
+          description: Rule updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Rule'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Rule not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    delete:
+      tags: [Rules]
+      summary: Delete a rule
+      parameters:
+        - $ref: '#/components/parameters/RuleId'
+      responses:
+        '204':
+          description: Deleted
+        '404':
+          description: Rule not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /decision/invokers/{apiInvokerId}/discoverable-apis:
+    get:
+      tags: [Decision]
+      summary: Get discoverable APIs filter for an invoker (global scope)
+      description: |
+        Returns a filtered list of APIs for the API Invoker.
+      parameters:
+        - $ref: '#/components/parameters/ApiInvokerId'
+      responses:
+        '200':
+          description: Discover filter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiscoveredAPIs'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Invoker not found (optional behavior)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+components:
+  parameters:
+    RuleId:
+      in: path
+      name: ruleId
+      required: true
+      schema:
+        type: string
+      description: Server-generated rule identifier
+    ApiInvokerId:
+      in: path
+      name: apiInvokerId
+      required: true
+      schema:
+        type: string
+      description: CAPIF API Invoker identifier
+
+  schemas:
+    # ---------- Core Rule Schemas ----------
+    RuleCreateRequest:
+      type: object
+      required: [providerSelector, default_access]
+      properties:
+        providerSelector:
+          $ref: '#/components/schemas/ProviderSelector'
+        invokerExceptions:
+          $ref: '#/components/schemas/InvokerSelector'
+        default_access:
+          type: string
+          enum: [ALLOW, DENY]
+        enabled:
+          type: boolean
+          default: true
+        startsAt:
+          type: string
+          format: date-time
+        endsAt:
+          type: string
+          format: date-time
+        notes:
+          type: string
+      description: |
+        Create a new rule. Provider selector is mandatory and must include at least one field.
+        If both startsAt and endsAt are present, endsAt must be greater than startsAt.
+
+    RulePatchRequest:
+      type: object
+      properties:
+        providerSelector:
+          $ref: '#/components/schemas/PatchProviderSelector'
+        invokerExceptions:
+          $ref: '#/components/schemas/InvokerSelector'
+        default_access:
+          type: string
+          enum: [ALLOW, DENY]
+        enabled:
+          type: boolean
+        startsAt:
+          type: string
+          format: date-time
+        endsAt:
+          type: string
+          format: date-time
+        notes:
+          type: string
+      description: Partial update. Any omitted field remains unchanged.
+
+    Rule:
+      type: object
+      properties:
+        ruleId:
+          type: string
+        providerSelector:
+          $ref: '#/components/schemas/ProviderSelector'
+        invokerExceptions:
+          $ref: '#/components/schemas/InvokerSelector'
+        default_access:
+          type: string
+          enum: [ALLOW, DENY]
+        enabled:
+          type: boolean
+          default: true
+        startsAt:
+          type: string
+          format: date-time
+        endsAt:
+          type: string
+          format: date-time
+        notes:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+        updatedBy:
+          type: string
+      required: [ruleId, providerSelector, default_access]
+    
+    PatchProviderSelector:
+      type: object
+      description: |
+        Patch Provider-side selector.
+      properties:
+        apiProviderId:
+          type: array
+          items: { type: string }
+          minItems: 0
+          uniqueItems: true
+        apiName:
+          type: array
+          items: { type: string }
+          minItems: 0
+          uniqueItems: true
+        apiId:
+          type: array
+          items: { type: string }
+          minItems: 0
+          uniqueItems: true
+        aefId:
+          type: array
+          items: { type: string }
+          minItems: 0
+          uniqueItems: true
+        userName:
+          type: string
+          minLength: 1
+      additionalProperties: false
+    
+    ProviderSelector:
+      type: object
+      description: |
+        Provider-side selector. Arrays apply OR within the field; AND across fields.
+        At least one of these fields must be present.
+      required:
+        - userName
+      properties:
+        userName:
+          type: string
+          minLength: 1
+        apiProviderId:
+          type: array
+          items: { type: string }
+          minItems: 0
+          uniqueItems: true
+        apiName:
+          type: array
+          items: { type: string }
+          minItems: 0
+          uniqueItems: true
+        apiId:
+          type: array
+          items: { type: string }
+          minItems: 0
+          uniqueItems: true
+        aefId:
+          type: array
+          items: { type: string }
+          minItems: 0
+          uniqueItems: true
+      additionalProperties: false
+
+    InvokerSelector:
+      type: object
+      description: Invoker-side selector used for exceptions. Optional; arrays use OR within the field; AND across fields.
+      properties:
+        invokerOnboardedByUser:
+          type: array
+          items: { type: string }
+          minItems: 0
+          uniqueItems: true
+        apiInvokerId:
+          type: array
+          items: { type: string }
+          minItems: 0
+          uniqueItems: true
+      additionalProperties: false
+
+    # ---------- Decision Schemas (3GPP Based) ----------
+    DiscoveredAPIs:
+      type: object
+      properties:
+        serviceAPIDescriptions:
+          type: array
+          items:
+            $ref: '#/components/schemas/ServiceAPIDescription'
+          minItems: 1
+        suppFeat:
+          $ref: '#/components/schemas/SupportedFeatures'
+
+    ServiceAPIDescription:
+      type: object
+      required: [apiName]
+      properties:
+        apiName: { type: string }
+        apiId: { type: string }
+        apiStatus: { $ref: '#/components/schemas/ApiStatus' }
+        aefProfiles:
+          type: array
+          items: { $ref: '#/components/schemas/AefProfile' }
+          minItems: 1
+        description: { type: string }
+        supportedFeatures: { $ref: '#/components/schemas/SupportedFeatures' }
+        shareableInfo: { $ref: '#/components/schemas/ShareableInformation' }
+        serviceAPICategory: { type: string }
+        apiSuppFeats: { $ref: '#/components/schemas/SupportedFeatures' }
+        pubApiPath: { $ref: '#/components/schemas/PublishedApiPath' }
+        ccfId: { type: string }
+        apiProvName: { type: string } 
+        #apiProvName is apiProviderId?
+
+
+    AefProfile:
+      type: object
+      required: [aefId, versions]
+      properties:
+        aefId: { type: string }
+        versions:
+          type: array
+          items: { $ref: '#/components/schemas/Version' }
+          minItems: 1
+        protocol: { $ref: '#/components/schemas/Protocol' }
+        dataFormat: { $ref: '#/components/schemas/DataFormat' }
+        securityMethods:
+          type: array
+          items: { $ref: '#/components/schemas/SecurityMethod' }
+        grantTypes:
+          type: array
+          items: { $ref: '#/components/schemas/OAuthGrantType' }
+        domainName: { type: string }
+        interfaceDescriptions:
+          type: array
+          items: { $ref: '#/components/schemas/InterfaceDescription' }
+        aefLocation: { $ref: '#/components/schemas/AefLocation' }
+        serviceKpis: { $ref: '#/components/schemas/ServiceKpis' }
+        ueIpRange: { $ref: '#/components/schemas/IpAddrRange' }
+
+    Version:
+      type: object
+      required: [apiVersion]
+      properties:
+        apiVersion: { type: string }
+        expiry: { type: string, format: date-time }
+        resources:
+          type: array
+          items: { $ref: '#/components/schemas/Resource' }
+        custOperations:
+          type: array
+          items: { $ref: '#/components/schemas/CustomOperation' }
+
+    Resource:
+      type: object
+      required: [commType, resourceName, uri]
+      properties:
+        resourceName: { type: string }
+        commType: { $ref: '#/components/schemas/CommunicationType' }
+        uri: { type: string }
+        custOpName: { type: string }
+        operations:
+          type: array
+          items: { $ref: '#/components/schemas/Operation' }
+        description: { type: string }
+
+    CustomOperation:
+      type: object
+      required: [commType, custOpName]
+      properties:
+        commType: { $ref: '#/components/schemas/CommunicationType' }
+        custOpName: { type: string }
+        operations:
+          type: array
+          items: { $ref: '#/components/schemas/Operation' }
+        description: { type: string }
+
+    ApiStatus:
+      type: object
+      required: [aefIds]
+      properties:
+        aefIds:
+          type: array
+          items: { type: string }
+
+    InterfaceDescription:
+      type: object
+      properties:
+        ipv4Addr: { type: string }
+        ipv6Addr: { type: string }
+        fqdn: { type: string }
+        port: { type: integer }
+        apiPrefix: { type: string }
+        securityMethods:
+          type: array
+          items: { $ref: '#/components/schemas/SecurityMethod' }
+        grantTypes:
+          type: array
+          items: { $ref: '#/components/schemas/OAuthGrantType' }
+
+    # ---------- Supporting 3GPP Types ----------
+    SupportedFeatures:
+      type: string
+      pattern: "^[A-Fa-f0-9]*$"
+    CommunicationType:
+      type: string
+      enum: [REQUEST_RESPONSE, SUBSCRIBE_NOTIFY]
+    Protocol:
+      type: string
+      enum: [HTTP_1_1, HTTP_2, MQTT, WEBSOCKET]
+    DataFormat:
+      type: string
+      enum: [JSON, XML, PROTOBUF3]
+    Operation:
+      type: string
+      enum: [GET, POST, PUT, PATCH, DELETE]
+    SecurityMethod:
+      type: string
+      enum: [PSK, PKI, OAUTH]
+    OAuthGrantType:
+      type: string
+      enum: [CLIENT_CREDENTIALS, AUTHORIZATION_CODE, AUTHORIZATION_CODE_WITH_PKCE]
+    
+    ShareableInformation:
+      type: object
+      required: [isShareable]
+      properties:
+        isShareable: { type: boolean }
+        capifProvDoms:
+          type: array
+          items: { type: string }
+    
+    PublishedApiPath:
+      type: object
+      properties:
+        ccfIds:
+          type: array
+          items: { type: string }
+
+    AefLocation:
+      type: object
+      properties:
+        dcId: { type: string }
+        # Simplified for brevity, you can add GeographicArea/CivicAddress if needed
+    
+    ServiceKpis:
+      type: object
+      properties:
+        maxReqRate: { type: integer }
+        maxRestime: { type: integer }
+        availability: { type: integer }
+        avalComp: { type: string }
+        avalMem: { type: string }
+        avalStor: { type: string }
+    
+    IpAddrRange:
+      type: object
+      properties:
+        ueIpv4AddrRanges:
+          type: array
+          items:
+            type: object
+            properties:
+              start: { type: string }
+              end: { type: string }
+
+    # ---------- Errors ----------
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code: { type: string }
+        message: { type: string }
+        details:
+          type: object
+          additionalProperties: true

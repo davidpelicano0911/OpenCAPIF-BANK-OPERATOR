@@ -1,0 +1,361 @@
+services:
+  redis:
+    image: "labs.etsi.org:5050/ocf/capif/redis:7.4.2-alpine"
+    command: redis-server
+    ports:
+      - "6379:6379"
+    volumes:
+      - ${SERVICES_DIR}/redis-data:/var/lib/redis
+      - ${SERVICES_DIR}/redis.conf:/usr/local/etc/redis/redis.conf
+    environment:
+      - REDIS_REPLICATION_MODE=master
+    
+
+  helper:
+    build:
+      context: ${SERVICES_DIR}/helper
+    expose:
+      - "8080"
+    container_name: helper
+    restart: unless-stopped
+    volumes:
+      - ${SERVICES_DIR}/helper/config.yaml:/usr/src/app/config.yaml
+      # - ${SERVICES_DIR}/helper/helper_service/certs:/usr/src/app/helper_service/certs
+    extra_hosts:
+      - host.docker.internal:host-gateway
+      - fluent-bit:host-gateway
+      - otel-collector:host-gateway
+      - vault:host-gateway
+    environment:
+      - CAPIF_HOSTNAME=${CAPIF_HOSTNAME}
+      - CONTAINER_NAME=helper
+      - VAULT_HOSTNAME=vault
+      - VAULT_ACCESS_TOKEN=dev-only-token
+      - VAULT_PORT=8200
+      - LOG_LEVEL=${LOG_LEVEL}
+    image: ${REGISTRY_BASE_URL}/helper:${OCF_VERSION}
+
+  access-control-policy:
+    build:
+      context: ${SERVICES_DIR}/TS29222_CAPIF_Access_Control_Policy_API
+    expose:
+      - "8080"
+    # volumes:
+    #   - ${SERVICES_DIR}/TS29222_CAPIF_Access_Control_Policy_API:/usr/src/app
+    extra_hosts:
+      - host.docker.internal:host-gateway
+      - fluent-bit:host-gateway
+      - otel-collector:host-gateway
+    environment:
+      - CAPIF_HOSTNAME=${CAPIF_HOSTNAME}
+      - CONTAINER_NAME=access-control-policy
+      - MONITORING=${MONITORING}
+      - LOG_LEVEL=${LOG_LEVEL}
+    restart: unless-stopped
+    image: ${REGISTRY_BASE_URL}/ocf-access-control-policy-api:${OCF_VERSION}
+    depends_on:
+      - redis
+      - nginx
+
+  api-invoker-management:
+    build:
+      context: ${SERVICES_DIR}/TS29222_CAPIF_API_Invoker_Management_API
+    expose:
+      - "8080"
+    volumes:
+      - ${SERVICES_DIR}/TS29222_CAPIF_API_Invoker_Management_API/config.yaml:/usr/src/app/config.yaml
+      - ${SERVICES_DIR}/TS29222_CAPIF_API_Invoker_Management_API/prepare_invoker.sh:/usr/src/app/prepare_invoker.sh
+    extra_hosts:
+      - host.docker.internal:host-gateway
+      - fluent-bit:host-gateway
+      - otel-collector:host-gateway
+      - vault:host-gateway
+    environment:
+      - CAPIF_HOSTNAME=${CAPIF_HOSTNAME}
+      - CONTAINER_NAME=api-invoker-management
+      - MONITORING=${MONITORING}
+      - VAULT_HOSTNAME=vault
+      - VAULT_ACCESS_TOKEN=dev-only-token
+      - VAULT_PORT=8200
+      - LOG_LEVEL=${LOG_LEVEL}
+    restart: unless-stopped
+    image: ${REGISTRY_BASE_URL}/ocf-api-invoker-management-api:${OCF_VERSION}
+    depends_on:
+    - redis
+    - nginx
+
+  api-provider-management:
+    build:
+      context: ${SERVICES_DIR}/TS29222_CAPIF_API_Provider_Management_API
+    expose:
+      - "8080"
+    volumes:
+      - ${SERVICES_DIR}/TS29222_CAPIF_API_Provider_Management_API/config.yaml:/usr/src/app/config.yaml
+      - ${SERVICES_DIR}/TS29222_CAPIF_API_Provider_Management_API/prepare_provider.sh:/usr/src/app/prepare_provider.sh
+    extra_hosts:
+      - host.docker.internal:host-gateway
+      - fluent-bit:host-gateway
+      - otel-collector:host-gateway
+      - vault:host-gateway
+    image: ${REGISTRY_BASE_URL}/ocf-api-provider-management-api:${OCF_VERSION}
+    environment:
+      - CAPIF_HOSTNAME=${CAPIF_HOSTNAME}
+      - CONTAINER_NAME=api-provider-management
+      - MONITORING=${MONITORING}
+      - VAULT_HOSTNAME=vault
+      - VAULT_ACCESS_TOKEN=dev-only-token
+      - VAULT_PORT=8200
+      - LOG_LEVEL=${LOG_LEVEL}
+    depends_on:
+      - redis
+      - nginx
+
+  logs:
+    build:
+      context: ${SERVICES_DIR}/TS29222_CAPIF_Auditing_API
+    expose:
+      - "8080"
+    volumes:
+      - ${SERVICES_DIR}/TS29222_CAPIF_Auditing_API/config.yaml:/usr/src/app/config.yaml
+    extra_hosts:
+      - host.docker.internal:host-gateway
+      - fluent-bit:host-gateway
+      - otel-collector:host-gateway
+    restart: unless-stopped
+    image: ${REGISTRY_BASE_URL}/ocf-auditing-api:${OCF_VERSION}
+    environment:
+      - CAPIF_HOSTNAME=${CAPIF_HOSTNAME}
+      - CONTAINER_NAME=api-auditing
+      - MONITORING=${MONITORING}
+      - LOG_LEVEL=${LOG_LEVEL}
+    depends_on:
+      - mongo
+
+  service-apis:
+    build:
+      context: ${SERVICES_DIR}/TS29222_CAPIF_Discover_Service_API
+    expose:
+      - "8080"
+    volumes:
+      - ${SERVICES_DIR}/TS29222_CAPIF_Discover_Service_API/config.yaml:/usr/src/app/config.yaml
+    restart: unless-stopped
+    extra_hosts:
+      - host.docker.internal:host-gateway
+      - fluent-bit:host-gateway
+      - otel-collector:host-gateway
+    image: ${REGISTRY_BASE_URL}/ocf-discover-service-api:${OCF_VERSION}
+    environment:
+      - CAPIF_HOSTNAME=${CAPIF_HOSTNAME}
+      - CONTAINER_NAME=services-apis
+      - MONITORING=${MONITORING}
+      - LOG_LEVEL=${LOG_LEVEL}
+    depends_on:
+    - mongo
+
+  open-api-disc:
+    build:
+      context: ${SERVICES_DIR}/TS29222_CAPIF_Open_Discover_Service_API
+    expose:
+      - "8080"
+    volumes:
+      - ${SERVICES_DIR}/TS29222_CAPIF_Open_Discover_Service_API/config.yaml:/usr/src/app/config.yaml
+      - ${SERVICES_DIR}/TS29222_CAPIF_Open_Discover_Service_API/prepare_open_discover.sh:/usr/src/app/prepare_open_discover.sh
+    restart: unless-stopped
+    extra_hosts:
+      - host.docker.internal:host-gateway
+      - vault:host-gateway
+    image: ${REGISTRY_BASE_URL}/ocf-open-discover-service-api:${OCF_VERSION}
+    environment:
+      - CAPIF_HOSTNAME=${CAPIF_HOSTNAME}
+      - CONTAINER_NAME=open-api-disc
+      - VAULT_HOSTNAME=vault
+      - VAULT_ACCESS_TOKEN=dev-only-token
+      - VAULT_PORT=8200
+      - LOG_LEVEL=${LOG_LEVEL}
+    depends_on:
+      - mongo
+      - helper
+
+  capif-events:
+    build:
+      context: ${SERVICES_DIR}/TS29222_CAPIF_Events_API
+    expose:
+      - "8080"
+    volumes:
+      - ${SERVICES_DIR}/TS29222_CAPIF_Events_API/config.yaml:/usr/src/app/config.yaml
+    image: ${REGISTRY_BASE_URL}/ocf-events-api:${OCF_VERSION}
+    environment:
+      - CAPIF_HOSTNAME=${CAPIF_HOSTNAME}
+      - CONTAINER_NAME=api-events
+      - MONITORING=${MONITORING}
+      - LOG_LEVEL=${LOG_LEVEL}
+      - TIMEOUT=10
+    extra_hosts:
+      - host.docker.internal:host-gateway
+      - fluent-bit:host-gateway
+      - otel-collector:host-gateway
+    depends_on:
+      - redis
+      - mongo
+
+  celery_worker:
+    build: 
+      context: ${SERVICES_DIR}/celery
+    environment:
+      - CELERY_MODE=worker
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - LOG_LEVEL=${LOG_LEVEL}
+    depends_on:
+      - redis
+      - mongo
+
+  celery_beat:
+    build: 
+      context: ${SERVICES_DIR}/celery
+    environment:
+      - CELERY_MODE=beat
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - LOG_LEVEL=${LOG_LEVEL}
+    depends_on:
+      - redis
+      - mongo
+  api-invocation-logs:
+    build:
+      context: ${SERVICES_DIR}/TS29222_CAPIF_Logging_API_Invocation_API
+    expose:
+      - "8080"
+    volumes:
+      - ${SERVICES_DIR}/TS29222_CAPIF_Logging_API_Invocation_API/config.yaml:/usr/src/app/config.yaml
+    restart: unless-stopped
+    image: ${REGISTRY_BASE_URL}/ocf-logging-api-invocation-api:${OCF_VERSION}
+    extra_hosts:
+      - host.docker.internal:host-gateway
+      - fluent-bit:host-gateway
+      - otel-collector:host-gateway
+    environment:
+      - CAPIF_HOSTNAME=${CAPIF_HOSTNAME}
+      - CONTAINER_NAME=api-invocation-logs
+      - MONITORING=${MONITORING}
+      - LOG_LEVEL=${LOG_LEVEL}
+    depends_on:
+      - mongo
+
+  published-apis:
+    build:
+      context: ${SERVICES_DIR}/TS29222_CAPIF_Publish_Service_API
+    expose:
+      - "8080"
+    volumes:
+      - ${SERVICES_DIR}/TS29222_CAPIF_Publish_Service_API/config.yaml:/usr/src/app/config.yaml
+    restart: unless-stopped
+    image: ${REGISTRY_BASE_URL}/ocf-publish-service-api:${OCF_VERSION}
+    extra_hosts:
+      - host.docker.internal:host-gateway
+      - fluent-bit:host-gateway
+      - otel-collector:host-gateway
+    environment:
+      - CAPIF_HOSTNAME=${CAPIF_HOSTNAME}
+      - CONTAINER_NAME=api-publish-apis
+      - MONITORING=${MONITORING}
+      - LOG_LEVEL=${LOG_LEVEL}
+    depends_on:
+      - redis
+      - mongo
+
+  capif-routing-info:
+    build:
+      context: ${SERVICES_DIR}/TS29222_CAPIF_Routing_Info_API
+    expose:
+      - "8080"
+    image: ${REGISTRY_BASE_URL}/ocf-routing-info-api:${OCF_VERSION}
+
+  capif-security:
+    build:
+      context: ${SERVICES_DIR}/TS29222_CAPIF_Security_API
+    expose:
+      - "8080"
+    volumes:
+      - ${SERVICES_DIR}/TS29222_CAPIF_Security_API/config.yaml:/usr/src/app/config.yaml
+      - ${SERVICES_DIR}/TS29222_CAPIF_Security_API/prepare_security.sh:/usr/src/app/prepare_security.sh
+    restart: unless-stopped
+    image: ${REGISTRY_BASE_URL}/ocf-security-api:${OCF_VERSION}
+    environment:
+      - CAPIF_HOSTNAME=${CAPIF_HOSTNAME}
+      - CONTAINER_NAME=api-security
+      - MONITORING=${MONITORING}
+      - VAULT_HOSTNAME=vault
+      - VAULT_ACCESS_TOKEN=dev-only-token
+      - VAULT_PORT=8200
+      - LOG_LEVEL=${LOG_LEVEL}
+      - TIMEOUT=10
+    extra_hosts:
+      - host.docker.internal:host-gateway
+      - fluent-bit:host-gateway
+      - otel-collector:host-gateway
+      - vault:host-gateway
+    depends_on:
+      - redis
+      - nginx
+
+  mongo:
+    image: labs.etsi.org:5050/ocf/capif/mongo:6.0.2
+    logging:
+      driver: 'none'
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: example
+  
+  mongo-express:
+    image: labs.etsi.org:5050/ocf/capif/mongo-express:1.0.0-alpha.4
+    logging:
+      driver: 'none'
+    restart: unless-stopped
+    ports:
+      - 8082:8081
+    environment:
+      ME_CONFIG_MONGODB_ENABLE_ADMIN: true
+      ME_CONFIG_BASICAUTH_USERNAME: admin
+      ME_CONFIG_BASICAUTH_PASSWORD: admin
+      ME_CONFIG_MONGODB_ADMINUSERNAME: root
+      ME_CONFIG_MONGODB_ADMINPASSWORD: example
+      ME_CONFIG_MONGODB_URL: mongodb://root:example@mongo:27017/
+    depends_on:
+      - mongo
+
+  nginx:
+    build:
+      context: ${SERVICES_DIR}/nginx
+    ports:
+      - "8080:8080"
+      - "443:443"
+    image: labs.etsi.org:5050/ocf/capif/nginx-ocf-patched:1.27.1
+    environment:
+      - CAPIF_HOSTNAME=${CAPIF_HOSTNAME}
+      - VAULT_HOSTNAME=vault
+      - VAULT_ACCESS_TOKEN=dev-only-token
+      - VAULT_PORT=8200
+      - LOG_LEVEL=${LOG_LEVEL}
+    hostname: ${CAPIF_HOSTNAME}
+    volumes:
+      # - ${SERVICES_DIR}/nginx/certs:/etc/nginx/certs
+      - ${SERVICES_DIR}/nginx/nginx_prepare.sh:/nginx_prepare.sh
+    extra_hosts:
+      - host.docker.internal:host-gateway
+      - vault:host-gateway
+    restart: unless-stopped
+    depends_on:
+      - redis
+      - service-apis
+      - open-api-disc
+      - api-invocation-logs
+      - published-apis
+      - capif-events
+      - logs
+
+networks:
+  default:
+    name: capif-network
+    external: true

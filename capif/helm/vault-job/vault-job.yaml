@@ -1,0 +1,156 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vault-prepare-certs
+  namespace: ocf-vault
+  labels:
+    io.kompose.service: api-invocation-logs
+    app: capif
+    app.kubernetes.io/name: capif
+    app.kubernetes.io/instance: capif
+data:
+  vault-prepare-certs.sh: |-
+     #!/bin/sh
+    
+     echo "install dependencies"
+     apk add --no-cache jq openssl
+
+     # Set Vault environment variables
+
+     export VAULT_ADDR='http://vault-internal:8200'
+     
+     # In standalone's mode. Please use the root's token
+     # or the token with the sufficient permissions
+     # to execute the next commands in vault
+     # otherwise, if use the vault as dev's mode. Just
+     # type the token's dev.
+     export VAULT_TOKEN=""
+     export DOMAIN1=*.ocf.pre-production
+     export DOMAIN2=*.ocf.validation
+     export DOMAIN3=*.ocf.develop
+
+     # local domains
+     # export DOMAIN4=*.pre-prod.svc.cluster.local
+     # export DOMAIN5=*.staging.svc.cluster.local
+     # export DOMAIN6=*.developer.svc.cluster.local
+     
+     vault secrets enable pki
+     
+     echo "# Generate a CA in Vault #"
+     vault secrets tune -max-lease-ttl=87600h pki
+     
+     vault write -field=certificate pki/root/generate/internal \
+          common_name="capif" \
+          issuer_name="root-2026" \
+          ttl=87600h > root_2026_ca.crt
+    
+     echo "# check root_2026_ca.crt #"
+     cat root_2026_ca.crt
+     
+     vault write pki/config/urls \
+          issuing_certificates="$VAULT_ADDR/v1/pki/ca" \
+          crl_distribution_points="$VAULT_ADDR/v1/pki/crl"
+     
+     # # Generate an intermediate CA in Vault
+     vault secrets enable -path=pki_int pki
+     
+     vault secrets tune -max-lease-ttl=43800h pki_int
+     
+     vault write -format=json pki_int/intermediate/generate/internal \
+          common_name="capif Intermediate Authority" \
+          issuer_name="capif-intermediate" \
+         | jq -r '.data.csr' > pki_intermediate.csr
+     
+     echo "### content pki_intermediate.csr ###"
+     cat pki_intermediate.csr
+     
+     # Sign the intermediate CA with the root CA
+     vault write -format=json pki/root/sign-intermediate \
+          issuer_ref="root-2026" \
+          csr=@pki_intermediate.csr \
+          format=pem_bundle ttl="43800h" \
+          | jq -r '.data.certificate' > capif_intermediate.cert.pem
+     
+     # Configure the intermediate AC in Vault
+     vault write pki_int/intermediate/set-signed certificate=@capif_intermediate.cert.pem
+     
+     # Create a role in Vault
+     vault write pki_int/roles/my-ca use_csr_common_name=false require_cn=false allowed_domains="*" allow_any_name=true allow_bare_domains=true allow_glob_domains=true allow_subdomains=true max_ttl=4300h ttl=4300h
+     
+     # Issue a certificate signed by the intermediary CA
+     # vault write -format=json pki_int/issue/my-ca \
+     #   common_name="nginx.mon.svc.cluster.local" \
+     #   format=pem_bundle ttl="438h" \
+     #   | jq -r '.data.certificate' > ccf_cert.crt.pem \
+     #   && jq -r '.data.issuing_ca' > root_ca.crt.pem \
+     #   && jq -r '.data.private_key' > private_key.pem
+     
+     #   vault write -format=json pki_int/issue/my-ca \
+     #   common_name="nginx.mon.svc.cluster.local" \
+     #   format=pem_bundle ttl="438h" \
+     #   | jq -r '.data.private_key as $private_key | .data.issuing_ca as $issuing_ca | .data.certificate as $certificate | [$private_key, $issuing_ca, $certificate]' > cert_data.json
+     
+     
+     ############################################################
+     # 4) CA BUNDLE (KV v2)
+     ############################################################
+
+     echo "### enable secrets kv ###"
+     vault secrets enable -path=secret -version=2 kv
+
+     # Store CA bundle at secret/ca (same as docker script)
+     vault kv put secret/ca ca=@capif_intermediate.cert.pem
+
+     echo "[INFO] CA bundle stored at secret/ca"
+
+     
+     #POLICY_NAME="my-policy"
+     #POLICY_FILE="my-policy.hcl"
+     #TOKEN_ID="read-ca-token"
+     
+     # Create the policy in Vault
+     #echo "path \"secret/data/ca\" {
+     #  capabilities = [\"read\"]
+     #}" > "$POLICY_FILE"
+     
+     #vault policy write "$POLICY_NAME" "$POLICY_FILE"
+     
+     # Generate a new token and assign the policy
+     #TOKEN=$(vault token create -id="$TOKEN_ID" -policy="$POLICY_NAME" -format=json | jq -r '.auth.client_token')
+     
+     #echo "Token generado:"
+     #echo "$TOKEN"
+---
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: vault-pki
+  namespace: ocf-vault
+  labels:
+    io.kompose.service: vault-pki
+    app: capif
+    app.kubernetes.io/name: capif
+    app.kubernetes.io/instance: capif
+spec:
+  template:
+    spec:
+      containers:
+      - name: vault-pki
+        image: docker.io/hashicorp/vault:1.15.1
+        command: ["./vault-prepare-certs.sh"]
+        volumeMounts:
+          - name: vault-prepare-certs
+            mountPath: vault-prepare-certs.sh
+            subPath: vault-prepare-certs.sh
+      restartPolicy: Never
+      volumes:
+      - name:  vault-prepare-certs
+        configMap:
+          name: vault-prepare-certs
+          defaultMode: 0777
+          items:
+          - key: "vault-prepare-certs.sh"
+            path: "vault-prepare-certs.sh"
+  backoffLimit: 4

@@ -1,0 +1,22 @@
+services:
+  mock-server:
+    build:
+      context: ${SERVICES_DIR}/mock_server
+    ports:
+      - 9100:9100
+    volumes:
+      - ${SERVICES_DIR}/mock_server:/usr/src/app
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    environment:
+      - DEBUG_MODE=True
+    restart: unless-stopped
+    image: ${REGISTRY_BASE_URL}/mock-server:${OCF_VERSION}
+
+networks:
+  default:
+    name: capif-network
+    external: true
+
+
+
