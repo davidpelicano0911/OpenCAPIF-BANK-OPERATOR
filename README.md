@@ -42,12 +42,8 @@ cd capif
 
 ### Step 0 — Bring the CAPIF system up (prerequisite)
 
-# fazer primeiro reset_demo.sh para limpar dados do passo anterior (apenas para demonstração)
 ```bash
-./reset_demo.sh
-```
-
-```bash
+./reset_demo.sh        # clears data from the previous run (demo only)
 ./check_demo.sh        # starts/repairs CAPIF; wait for "✓ Sistema PRONTO"
 ```
 
@@ -150,16 +146,19 @@ Detailed guides live in `capif/`:
 | `capif/docs/PLANO_SLIDES.md` | Slide-by-slide structure |
 | `capif/FAQ.md` | Frequently asked questions |
 
+---
 
+## How mTLS works here (in short)
 
+After onboarding, the Operator/Bank no longer use passwords — they authenticate with
+their certificate. Every call to CAPIF Core (`:443`, fronted by nginx) is **mutually**
+authenticated:
 
+- **Client → server:** the client presents its certificate (e.g. `APF_operadora_5g`) and
+  signs the handshake with its private key. nginx validates it against the CA
+  (`ssl_client_certificate ca.crt`). *(in code: `cert=_cert(...)`)*
+- **Server → client:** nginx presents `server.crt`; the client validates it against the
+  same CA. *(in code: `verify=_verify()` → `ca.crt`)*
 
-![alt text](image.png)
-
-operadaora/banco apresnetam o seu cert (APF_operadora_5g (par)) dps o ngnix valida com ssl_client_certificate /etc/nginx/certs/ca.crt 
-
-ngnix apresenta server.crt 
-o cliente valida com verify = ca.crt (verify())
-
-cliente usa o ca.crt para validar o server.crt do core (verify=ca.crt)
-servid
+Both certificates are signed by the same authority (the **Vault** CA), so each side trusts
+the other. The private keys never leave the machine — they only sign.
