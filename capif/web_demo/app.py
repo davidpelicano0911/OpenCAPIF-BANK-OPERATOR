@@ -8,7 +8,8 @@ Páginas:
   /banco       → portal do Banco (Invoker)
 
 Endpoints (estado partilhado → ligam os portais ATRAVÉS do CAPIF):
-  POST /api/op/register   /api/op/publish
+  GET  /api/state    (snapshot do estado partilhado, para a barra de estado)
+  POST /api/op/register   /api/op/publish   /api/op/audit
   POST /api/bk/register   /api/bk/discover   /api/bk/token
   POST /api/bk/check  (body: {"phone": "..."})    /api/bk/check-notoken
   POST /api/reset
@@ -64,6 +65,9 @@ class H(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = self.path.split("?")[0]
+        if path == "/api/state":
+            self._json(200, flow.snapshot())
+            return
         if path in PAGES:
             self._file(os.path.join(STATIC, PAGES[path]))
             return
@@ -82,6 +86,8 @@ class H(BaseHTTPRequestHandler):
                 self._json(200, flow.op_register())
             elif p == "/api/op/publish":
                 self._json(200, flow.op_publish())
+            elif p == "/api/op/audit":
+                self._json(200, flow.op_audit())
             elif p == "/api/bk/register":
                 self._json(200, flow.bk_register())
             elif p == "/api/bk/discover":
@@ -103,7 +109,18 @@ class H(BaseHTTPRequestHandler):
             else:
                 self._json(404, {"error": "not_found"})
         except Exception as e:
-            self._json(500, {"ok": False, "error": str(e)})
+            # Return a card-shaped result so the UI shows a readable error
+            # (with the real cause) instead of "undefined".
+            msg = str(e)
+            if "CERTIFICATE_VERIFY_FAILED" in msg or "unknown ca" in msg:
+                msg = ("TLS certificate mismatch between Register and CAPIF Core. "
+                       "The stack's CA is inconsistent — do a clean restart "
+                       "(clean_capif_docker_services.sh -a && run.sh). Details: " + msg)
+            elif "Connection refused" in msg or "Max retries" in msg:
+                msg = ("Could not reach CAPIF Core (capifcore:443). Is the stack up "
+                       "and nginx not Restarting? Details: " + msg)
+            print(f"  [web] ERROR on {p}: {e}", flush=True)
+            self._json(500, {"ok": False, "title": "Error", "summary": msg})
 
 
 if __name__ == "__main__":

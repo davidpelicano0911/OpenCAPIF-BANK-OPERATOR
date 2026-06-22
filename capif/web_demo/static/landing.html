@@ -36,22 +36,29 @@
 <section class="demo-flow">
   <h2>API Lifetime Flow</h2>
   <div class="flow-steps">
-    <div class="flow-step">
+    <div class="flow-step theme-operator">
       <div class="step-num">1</div>
       <h3>Publish API</h3>
-      <p>The <strong>Operator</strong> registers via mTLS and publishes the SIM Swap API to the CAPIF catalog.</p>
+      <p>The <strong>Operator</strong> registers via mTLS (<strong>APF</strong> cert) and publishes the SIM Swap API to the CAPIF catalog.</p>
+      <div class="flow-calls"><code>POST /registrations</code><code>POST /service-apis</code></div>
     </div>
-    <div class="flow-arrow">&rarr;</div>
-    <div class="flow-step">
+    <div class="flow-step theme-bank">
       <div class="step-num">2</div>
-      <h3>Discover & Authorize</h3>
+      <h3>Discover &amp; Authorize</h3>
       <p>The <strong>Bank</strong> registers, discovers the cataloged API, and requests an OAuth2 access token from CAPIF.</p>
+      <div class="flow-calls"><code>POST /onboardedInvokers</code><code>GET /allServiceAPIs</code><code>POST /token</code></div>
     </div>
-    <div class="flow-arrow">&rarr;</div>
-    <div class="flow-step">
+    <div class="flow-step theme-bank">
       <div class="step-num">3</div>
-      <h3>Consume & Protect</h3>
-      <p>The <strong>Bank</strong> calls the SIM Swap API using the token to securely validate and authorize transactions.</p>
+      <h3>Consume &amp; Protect</h3>
+      <p>The <strong>Bank</strong> calls the SIM Swap API; the <strong>AEF</strong> verifies the token signature and logs the invocation.</p>
+      <div class="flow-calls"><code>POST /sim-swap/check</code><code>POST /api-invocation-logs</code></div>
+    </div>
+    <div class="flow-step theme-operator">
+      <div class="step-num">4</div>
+      <h3>Audit</h3>
+      <p>The <strong>Operator</strong> (<strong>AMF</strong> cert) audits CAPIF to see who invoked the API and when.</p>
+      <div class="flow-calls"><code>GET /logs/apiInvocationLogs</code></div>
     </div>
   </div>
 </section>

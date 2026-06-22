@@ -12,6 +12,7 @@ portals THROUGH CAPIF, just like in reality. Does not touch demo_capif.py.
 
 import os
 import socket
+from datetime import datetime, timezone
 import requests
 import urllib3
 from cryptography.hazmat.primitives import serialization, hashes
@@ -69,6 +70,8 @@ def _gen_csr(name, cn):
                x509.NameAttribute(NameOID.ORGANIZATION_NAME, "CAPIF System"),
                x509.NameAttribute(NameOID.COUNTRY_NAME, "PT")]))
            .sign(key, hashes.SHA256()))
+
+    # guardar a chave privada em disco 
     with open(f"{WORK_DIR}/{name}.key", "wb") as f:
         f.write(key.private_bytes(serialization.Encoding.PEM,
                 serialization.PrivateFormat.TraditionalOpenSSL,
@@ -103,10 +106,27 @@ class CapifFlow:
     def __init__(self):
         os.makedirs(WORK_DIR, exist_ok=True)
         self.admin_token = None
-        self.apf_id = self.aef_id = self.api_id = None
+        self.apf_id = self.aef_id = self.amf_id = self.api_id = None
         self.invoker_id = None
         self.aef_url = None
         self.token = None
+
+    def snapshot(self):
+        """Shared-state view for both portals — proves they share ONE CapifFlow.
+
+        Returns ids/flags so each portal can show what the OTHER actor has already
+        done THROUGH CAPIF (e.g. the Bank tab sees the API the Operator published).
+        """
+        return {
+            "operator_registered": bool(self.apf_id),
+            "api_published": bool(self.api_id),
+            "invoker_registered": bool(self.invoker_id),
+            "has_token": bool(self.token),
+            "apf_id": self.apf_id,
+            "aef_id": self.aef_id,
+            "api_id": self.api_id,
+            "invoker_id": self.invoker_id,
+        }
 
     def _r(self, ok, title, summary, calls=None, data=None, mongo=None):
         return {"ok": ok, "title": title, "summary": summary,
@@ -128,7 +148,7 @@ class CapifFlow:
         body.update(extra)
         _log("ADMIN", f"POST /createUser -> Register :8084 (creates '{username}', using ADMIN JWT)")
         return requests.post(f"{REGISTER}/createUser", headers=h, verify=_verify(),
-                             json=body).status_code
+                             json=body, timeout=10).status_code
 
     def _getauth(self, username, password):
         return requests.get(f"{REGISTER}/getauth", auth=(username, password),
@@ -137,7 +157,7 @@ class CapifFlow:
     # ================= OPERATOR =================
     def op_register(self):
         calls = []
-        self.apf_id = self.aef_id = self.api_id = None
+        self.apf_id = self.aef_id = self.amf_id = self.api_id = None
         self._ensure_account("operadora_5g", "Operadora123",
                              enterprise="Operator", country="PT",
                              email="apf@operator.pt", purpose="API Provider")
@@ -180,6 +200,8 @@ class CapifFlow:
                 self.apf_id = func.get("apiProvFuncId")
             if role == "AEF":
                 self.aef_id = func.get("apiProvFuncId")
+            if role == "AMF":
+                self.amf_id = func.get("apiProvFuncId")
         _log("OPERATOR", f"<- received {len(certs)} signed certificates from Vault (via Core :443): "
                          f"{', '.join(certs)}  | APF_ID={self.apf_id}")
         calls.append(self._call("POST /registrations (3 CSRs)", 201, True))
@@ -188,7 +210,7 @@ class CapifFlow:
                        "certificates (APF, AEF, AMF). Authentication is now done via mTLS (certificate) "
                        "without passwords.",
                        calls, {"certificates": certs, "apf_id": self.apf_id,
-                               "aef_id": self.aef_id},
+                               "aef_id": self.aef_id, "amf_id": self.amf_id},
                        "capif > providerenrolmentdetails")
 
     def op_publish(self):
@@ -223,6 +245,54 @@ class CapifFlow:
                        {"api_id": self.api_id, "api_name": "SIM_Swap",
                         "endpoint": "POST 127.0.0.1:9200/sim-swap/check"},
                        "capif > serviceapidescriptions")
+
+    def op_audit(self):
+        """AMF role: audit the invocation logs (GET Auditing API, mTLS with AMF cert).
+
+        This is the third provider function (APF publishes, AEF exposes/logs, AMF audits),
+        closing the loop so the Operator can see who called the API and when.
+        """
+        cert = _cert("AMF_operadora_5g")
+        if not cert:
+            return self._r(False, "Audit Invocations", "Register with CAPIF Core first.")
+        if not (self.aef_id and self.invoker_id):
+            return self._r(False, "Audit Invocations",
+                           "No invocations yet — the Bank must obtain a token and run a "
+                           "Fraud Check first.")
+        _log("AMF", "GET /logs/v1/apiInvocationLogs -> CAPIF Core :443 (mTLS, AMF cert)")
+        r = requests.get(
+            f"{CAPIF}/logs/v1/apiInvocationLogs"
+            f"?aef-id={self.aef_id}&api-invoker-id={self.invoker_id}",
+            cert=cert, verify=_verify(), timeout=15)
+        if r.status_code == 404:
+            # The Auditing API returns 404 when there are simply no logs yet.
+            _log("AMF", "<- CAPIF Core :443 has no invocation logs yet (404)")
+            return self._r(True, "Audit Invocations",
+                           "No invocations logged yet — run a Fraud Check (Bank → Check) "
+                           "first, then audit again.",
+                           [self._call("GET apiInvocationLogs (AMF mTLS)", 404, True,
+                                       "no logs yet")],
+                           {"logs": []})
+        if r.status_code != 200:
+            return self._r(False, "Audit Invocations",
+                           f"Auditing API returned {r.status_code}.",
+                           [self._call("GET apiInvocationLogs (AMF mTLS)", r.status_code,
+                                       False, r.text[:80])])
+        logs = []
+        for entry in r.json().get("logs", []):
+            logs.append({"apiName": entry.get("apiName"),
+                         "operation": entry.get("operation"),
+                         "uri": entry.get("uri"),
+                         "result": entry.get("result"),
+                         "invocationTime": entry.get("invocationTime")})
+        _log("AMF", f"<- CAPIF Core :443 returned {len(logs)} invocation log entry(ies)")
+        return self._r(True, "Audit Invocations",
+                       f"The AMF (Management Function) audited CAPIF and found {len(logs)} "
+                       "logged invocation(s) of the SIM Swap API by this invoker. This is the "
+                       "third provider role at work: APF publishes, AEF exposes, AMF audits.",
+                       [self._call("GET apiInvocationLogs (AMF mTLS)", 200, True)],
+                       {"logs": logs, "invoker_id": self.invoker_id},
+                       "capif > invocationlogs")
 
     # ================= BANK =================
     def bk_register(self):
@@ -350,6 +420,13 @@ class CapifFlow:
                            "Make sure sim_swap_mock.py is running.")
         approve = not d.get("swapped")
         _log("BANK", f"<- Mock :9200 replied swapped={d.get('swapped')} -> {'APPROVE' if approve else 'BLOCK'}")
+        calls = [self._call(f"POST /sim-swap/check ({phone})", r.status_code, approve)]
+        # The AEF reports the invocation to CAPIF's Logging API (mTLS with the AEF cert).
+        # In a "purist" 3GPP deployment the AEF server (the mock) would do this; here we keep
+        # it in capif_flow.py because that is where the AEF cert/key live (/tmp/capif_demo).
+        log_call = self._log_invocation(r.status_code)
+        if log_call:
+            calls.append(log_call)
         if approve:
             summary = (f"Queried the Operator: has {phone} had a recent SIM swap? "
                        f"Response: NO. The bank approves the transaction.")
@@ -357,7 +434,36 @@ class CapifFlow:
             summary = (f"Queried the Operator: has {phone} had a recent SIM swap? "
                        f"Response: YES, on {d.get('lastSwapTime')}. Possible fraud "
                        f"(SIM swap cloning) — the bank blocks the transaction.")
-        return self._r(True, "Fraud Check", summary,
-                       [self._call(f"POST /sim-swap/check ({phone})", r.status_code, approve)],
+        return self._r(True, "Fraud Check", summary, calls,
                        {"phone": phone, "swapped": d.get("swapped"),
                         "decision": "APPROVE" if approve else "BLOCK"})
+
+    def _log_invocation(self, result):
+        """AEF logs an API invocation to CAPIF (POST Logging API, mTLS with AEF cert).
+
+        Returns a _call() dict to show in the UI, or None if it could not be sent.
+        A logging failure must never break the fraud check, so everything is guarded.
+        """
+        cert = _cert("AEF_operadora_5g")
+        if not (self.aef_id and self.invoker_id and cert):
+            return None
+        body = {"aefId": self.aef_id, "apiInvokerId": self.invoker_id,
+                "supportedFeatures": "0",
+                "logs": [{"apiId": self.api_id, "apiName": "SIM_Swap",
+                          "apiVersion": "v1", "resourceName": "checkSimSwap",
+                          "uri": "/sim-swap/check", "protocol": "HTTP_1_1",
+                          "operation": "POST", "result": str(result),
+                          "invocationTime": datetime.now(timezone.utc)
+                          .strftime("%Y-%m-%dT%H:%M:%S.000Z")}]}
+        _log("AEF", f"POST /api-invocation-logs -> CAPIF Core :443 (mTLS, AEF cert) result={result}")
+        try:
+            rl = requests.post(
+                f"{CAPIF}/api-invocation-logs/v1/{self.aef_id}/logs",
+                json=body, cert=cert, verify=_verify(), timeout=15)
+            ok = rl.status_code in (200, 201)
+            _log("AEF", f"<- CAPIF Core :443 stored invocation log (HTTP {rl.status_code})")
+            return self._call("POST api-invocation-logs (AEF mTLS)", rl.status_code,
+                              ok, "" if ok else rl.text[:80])
+        except Exception as e:
+            _log("AEF", f"<- logging failed (ignored): {e}")
+            return None

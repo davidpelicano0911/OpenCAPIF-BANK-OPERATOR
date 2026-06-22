@@ -81,6 +81,12 @@ h1 { font-size: 22px; font-weight: 600; letter-spacing: -0.01em; }
 .portal-link:hover .action-hint {
   transform: translateX(4px);
 }
+.portal-link .chip {
+  align-self: flex-start;
+  color: var(--tone);
+  border: 1px solid var(--tone);
+  background: transparent;
+}
 
 /* ---------- portal header ---------- */
 .portal-header {
@@ -165,52 +171,99 @@ footer { text-align: center; margin-top: 48px; color: var(--muted); font-size: 1
   color: var(--text);
 }
 .flow-steps {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 20px;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 18px;
+  align-items: stretch;
 }
 .flow-step {
-  flex: 1;
-  min-width: 240px;
-  max-width: 320px;
-  background: var(--panel-2);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, var(--panel) 0%, rgba(19, 26, 36, 0.5) 100%);
   border: 1px solid var(--line);
+  border-top: 3px solid var(--tone, var(--line));
   border-radius: 12px;
-  padding: 24px;
+  padding: 22px 20px;
   text-align: left;
+  transition: transform .18s, box-shadow .18s, border-color .18s;
+}
+.flow-step:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.22);
 }
 .flow-step .step-num {
-  width: 30px;
-  height: 30px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
-  background: var(--line);
-  color: var(--text);
+  background: var(--tone, var(--line));
+  color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 15px;
   font-weight: 700;
   margin-bottom: 14px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.25);
 }
 .flow-step h3 {
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 600;
   margin-bottom: 8px;
 }
 .flow-step p {
-  font-size: 13.5px;
+  font-size: 13px;
   color: var(--muted);
-  line-height: 1.6;
+  line-height: 1.55;
+  flex-grow: 1;
 }
-.flow-arrow {
-  font-size: 28px;
-  color: var(--line);
-  user-select: none;
+.flow-calls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 14px;
+}
+.flow-calls code {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 10.5px;
+  color: var(--tone, var(--muted));
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 2px 7px;
 }
 @media (max-width: 992px) {
   .portals { grid-template-columns: 1fr; }
-  .flow-steps { flex-direction: column; }
-  .flow-arrow { transform: rotate(90deg); margin: 10px 0; }
+  .flow-steps { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 560px) {
+  .flow-steps { grid-template-columns: 1fr; }
+}
+
+/* ---------- shared-state bar ---------- */
+.state-bar {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  margin: 14px 0 18px; padding: 10px 12px;
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px;
+}
+.state-bar:empty { display: none; }
+.state-item {
+  font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 5px;
+  border: 1px solid var(--line); color: var(--muted); background: var(--panel);
+}
+.state-item.on { color: var(--ok); border-color: var(--ok); }
+.state-item.off { color: var(--muted); opacity: 0.7; }
+
+/* ---------- collapsible raw JSON ---------- */
+details.raw { margin-top: 10px; }
+details.raw summary {
+  cursor: pointer; font-size: 12px; color: var(--muted);
+  user-select: none; list-style: none;
+}
+details.raw summary:hover { color: var(--text); }
+details.raw pre {
+  margin-top: 8px; padding: 10px 12px; overflow-x: auto;
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 11.5px; color: var(--text); line-height: 1.5;
 }

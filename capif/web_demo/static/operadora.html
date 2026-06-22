@@ -16,9 +16,12 @@
 
 <p class="hint">Follow the steps in order. Step 2 unlocks after step 1 succeeds. Then open CAPIF (MongoDB) to see the published API.</p>
 
+<div id="state-bar" class="state-bar" title="Shared CAPIF state — also reflects what the Bank does"></div>
+
 <section class="steps">
   <button id="b-register">1 &nbsp; Register with CAPIF Core</button>
   <button id="b-publish" disabled>2 &nbsp; Publish SIM Swap API</button>
+  <button id="b-audit" disabled>3 &nbsp; Audit invocations (AMF)</button>
 </section>
 <section class="steps">
   <a class="link" href="http://localhost:8082" target="_blank">Open CAPIF (MongoDB)</a>
@@ -33,9 +36,11 @@
 <script>
   // Reset states on load to counter browser caching/restoring states
   document.getElementById("b-publish").disabled = true;
+  document.getElementById("b-audit").disabled = true;
 
   wire("b-register", "/api/op/register", null, () => enable("b-publish"));
-  wire("b-publish", "/api/op/publish");
+  wire("b-publish", "/api/op/publish", null, () => enable("b-audit"));
+  wire("b-audit", "/api/op/audit");
   document.getElementById("b-reset").addEventListener("click", resetAll);
 </script>
 </body>

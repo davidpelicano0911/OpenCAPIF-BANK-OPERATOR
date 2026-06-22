@@ -36,6 +36,14 @@ function render(result) {
         <b>${a.name}</b><div class="muted">${a.description}</div>
         <div class="muted">${a.endpoint || ""}</div></div>`).join("");
   }
+  if (d.logs) {
+    html += d.logs.length
+      ? d.logs.map(l => `<div class="api-found">
+          <b>${l.operation || ""} ${l.apiName || ""}</b>
+          <div class="muted">${l.uri || ""} &middot; HTTP ${l.result || ""}</div>
+          <div class="muted">${l.invocationTime || ""}</div></div>`).join("")
+      : `<div class="muted">No invocations logged yet.</div>`;
+  }
   if (d.certificates) {
     html += `<div class="chips">` +
       d.certificates.map(c => `<span class="chip">${c} certificate</span>`).join("") + `</div>`;
@@ -50,10 +58,39 @@ function render(result) {
   }
   if (result.mongo) html += `<div class="mongo">Stored in CAPIF &rarr; ${result.mongo}</div>`;
 
+  // Real data returned by the server, collapsible for the curious.
+  if (result.data && Object.keys(result.data).length) {
+    html += `<details class="raw"><summary>Show raw data (JSON)</summary>
+      <pre>${escapeHtml(JSON.stringify(result.data, null, 2))}</pre></details>`;
+  }
+
   card.innerHTML = html;
   out.appendChild(card);
   card.scrollIntoView({ behavior: "smooth", block: "center" });
+  refreshState();
   return result;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+}
+
+// Shared-state bar: shows what BOTH actors have done through the single CapifFlow
+// on the server. Refreshed after each action and via a light poll, so e.g. the
+// Bank tab reflects the API the Operator just published.
+async function refreshState() {
+  const bar = document.getElementById("state-bar");
+  if (!bar) return;
+  let s;
+  try { s = await (await fetch("/api/state")).json(); }
+  catch (e) { return; }
+  const item = (on, label) =>
+    `<span class="state-item ${on ? "on" : "off"}">${on ? "●" : "○"} ${label}</span>`;
+  bar.innerHTML =
+    item(s.operator_registered, "Operator registered") +
+    item(s.api_published, "API published") +
+    item(s.invoker_registered, "Bank registered") +
+    item(s.has_token, "Token issued");
 }
 
 // Wire a button to an endpoint. onOk runs only if the action succeeded.
@@ -78,4 +115,10 @@ function enable(id) { const el = document.getElementById(id); if (el) el.disable
 async function resetAll() {
   await runAction("/api/reset");
   location.reload();
+}
+
+// Keep the shared-state bar fresh so each tab reflects the other actor's progress.
+if (document.getElementById("state-bar")) {
+  refreshState();
+  setInterval(refreshState, 4000);
 }
