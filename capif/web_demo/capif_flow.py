@@ -121,6 +121,7 @@ class CapifFlow:
             "operator_registered": bool(self.apf_id),
             "api_published": bool(self.api_id),
             "invoker_registered": bool(self.invoker_id),
+            "discovered": bool(self.aef_url),
             "has_token": bool(self.token),
             "apf_id": self.apf_id,
             "aef_id": self.aef_id,

@@ -91,6 +91,19 @@ async function refreshState() {
     item(s.api_published, "API published") +
     item(s.invoker_registered, "Bank registered") +
     item(s.has_token, "Token issued");
+
+  // Sync buttons with the SERVER state so a browser reload does NOT force redoing
+  // earlier steps — the work lives in the shared CapifFlow, not in the page.
+  if (s.operator_registered) enable("b-publish");   // Operator portal
+  if (s.api_published) enable("b-audit");
+  if (s.invoker_registered) enable("b-discover");    // Bank portal
+  if (s.discovered) enable("b-token");
+  if (s.has_token) {
+    enable("b-check"); enable("phone");
+    const hint = document.getElementById("check-hint");
+    if (hint) hint.textContent =
+      "Unlocked. Try +351912345678 (safe) or +351911111111 (SIM swapped).";
+  }
 }
 
 // Wire a button to an endpoint. onOk runs only if the action succeeded.
