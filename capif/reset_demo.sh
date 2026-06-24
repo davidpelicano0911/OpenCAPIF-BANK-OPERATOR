@@ -17,7 +17,7 @@ MONGO_URI="mongodb://root:example@localhost:27017/capif?authSource=admin"
 echo "A limpar dados do CAPIF Core (corridas anteriores da demo)..."
 
 docker exec "$MONGO_CONTAINER" mongosh "$MONGO_URI" --quiet --eval '
-  ["providerenrolmentdetails","serviceapidescriptions","invokerdetails","serviceapisecurity","invocationlogs"]
+  ["providerenrolmentdetails","serviceapidescriptions","invokerdetails","security","invocationlogs"]
     .forEach(function (c) {
       var n = db.getCollection(c).deleteMany({}).deletedCount;
       print("  " + c + ": " + n + " documentos apagados");
