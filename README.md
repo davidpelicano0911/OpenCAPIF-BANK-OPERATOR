@@ -102,17 +102,14 @@ python3 sim_swap_mock.py
 
 ---
 
-## What to say (closing line)
-
-> *"I demonstrated the full lifecycle of a 5G network API — publish, discover,
-> authorize, access — with three security layers (JWT, mTLS, OAuth2). And the Bank
-> never spoke directly to the Operator: everything went through CAPIF, the gatekeeper."*
-
----
-
 ## Troubleshooting
 
-- **`400 SSL certificate` when publishing** (CA desynced, e.g. laptop slept):
+- **`SSL CERTIFICATE_VERIFY_FAILED` / `400 SSL certificate`** (stale local CA after a
+  stack restart). Quick fix — clear the local certs and retry Register:
+  ```bash
+  rm -rf /tmp/capif_demo
+  ```
+  If the stack itself is desynced (e.g. laptop slept), do a clean restart:
   ```bash
   cd capif/services && source ./variables.sh && ./clean_capif_docker_services.sh -a && ./run.sh && sleep 30 && docker restart register && sleep 15
   ```
@@ -133,20 +130,7 @@ python3 sim_swap_mock.py
 
 ---
 
-## More docs
 
-Detailed guides live in `capif/`:
-
-| File | What it is |
-|---|---|
-| `capif/Finaldemo.md` | Full guide (story, security, flow, run) — in Portuguese |
-| `capif/docs/GUIA_DEMO.md` | Detailed technical step-by-step |
-| `capif/docs/GUIAO_DEMO_AO_VIVO.md` | Live narration script |
-| `capif/docs/NOTAS_PASSOS.md` | Notes + Mermaid diagrams per step |
-| `capif/docs/PLANO_SLIDES.md` | Slide-by-slide structure |
-| `capif/FAQ.md` | Frequently asked questions |
-
----
 
 ## How mTLS works here (in short)
 
